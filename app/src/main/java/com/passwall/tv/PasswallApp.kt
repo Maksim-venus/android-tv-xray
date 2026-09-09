@@ -49,7 +49,7 @@ class PasswallApp : Application() {
                 stopProxy = { ProxyRuntime.requestStopFromApp(this) },
             ),
         )
-        appScope.launch { repository.seedIfEmpty() }
+        appScope.launch { repository.ensureSettings() }
     }
 
     companion object {

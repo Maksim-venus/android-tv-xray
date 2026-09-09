@@ -30,6 +30,12 @@ interface NodeDao {
     @Query("DELETE FROM nodes WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM nodes WHERE source = :source")
+    suspend fun deleteBySource(source: String)
+
+    @Query("DELETE FROM nodes WHERE host LIKE '%.example.com'")
+    suspend fun deleteExampleHosts()
+
     @Query("DELETE FROM nodes WHERE subscriptionId = :subscriptionId")
     suspend fun deleteBySubscription(subscriptionId: Long)
 

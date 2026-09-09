@@ -1,9 +1,8 @@
 package com.passwall.tv.ui.settings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +28,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,15 +43,17 @@ import com.passwall.tv.ui.components.CheckIcon
 import com.passwall.tv.ui.components.GlobeIcon
 import com.passwall.tv.ui.components.PencilIcon
 import com.passwall.tv.ui.components.qrImage
+import com.passwall.tv.ui.components.tvClickable
 import com.passwall.tv.ui.theme.Accent
+import com.passwall.tv.ui.theme.BorderIdle
 import com.passwall.tv.ui.theme.Card
 import com.passwall.tv.ui.theme.Card2
+import com.passwall.tv.ui.theme.FocusRing
+import com.passwall.tv.ui.theme.Ink
 import com.passwall.tv.ui.theme.OnlineGreen
 import com.passwall.tv.ui.theme.TextMuted
 import com.passwall.tv.ui.theme.VlessPurple
 import com.passwall.tv.ui.theme.VmessBlue
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun SettingsScreen(
@@ -65,9 +69,9 @@ fun SettingsScreen(
             .padding(horizontal = 40.dp, vertical = 28.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FocusableIcon(onBack) { BackArrowIcon() }
+            FocusableIcon(onBack) { BackArrowIcon(color = Ink) }
             Spacer(Modifier.width(12.dp))
-            Text("设置", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Text("设置", color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(20.dp))
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
@@ -79,13 +83,18 @@ fun SettingsScreen(
             ) {
                 Text("节点列表", color = TextMuted, fontSize = 14.sp)
                 Spacer(Modifier.height(10.dp))
-                state.nodes.forEach { node ->
-                    NodeRow(
-                        node = node,
-                        selected = node.id == state.selectedNodeId,
-                        onClick = { onSelectNode(node.id) },
-                    )
-                    Spacer(Modifier.height(10.dp))
+                if (state.nodes.isEmpty()) {
+                    EmptyNodesHint()
+                    Spacer(Modifier.height(12.dp))
+                } else {
+                    state.nodes.forEach { node ->
+                        NodeRow(
+                            node = node,
+                            selected = node.id == state.selectedNodeId,
+                            onClick = { onSelectNode(node.id) },
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
                 ToggleRow(
@@ -107,22 +116,47 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun EmptyNodesHint() {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Card, RoundedCornerShape(14.dp))
+            .border(2.dp, BorderIdle, RoundedCornerShape(14.dp))
+            .padding(18.dp),
+    ) {
+        Text("还没有节点", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "请开启右侧「HTTP 编辑」，用手机浏览器导入 vless:// 或 vmess://。",
+            color = TextMuted,
+            fontSize = 15.sp,
+        )
+    }
+}
+
+@Composable
 private fun NodeRow(node: ProxyNode, selected: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val borderWidth = if (focused) 5.dp else if (selected) 3.dp else 1.5.dp
     val border = when {
+        focused -> FocusRing
         selected -> Accent
-        focused -> Accent.copy(alpha = 0.8f)
-        else -> Color.Transparent
+        else -> BorderIdle
     }
     Row(
         Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                val s = if (focused) 1.03f else 1f
+                scaleX = s
+                scaleY = s
+            }
+            .shadow(if (focused) 14.dp else 2.dp, RoundedCornerShape(14.dp))
             .clip(RoundedCornerShape(14.dp))
             .background(Card)
-            .border(2.dp, border, RoundedCornerShape(14.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .border(borderWidth, border, RoundedCornerShape(14.dp))
+            .tvClickable(interaction, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -135,9 +169,9 @@ private fun NodeRow(node: ProxyNode, selected: Boolean, onClick: () -> Unit) {
             Text(node.protocol.badge, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(14.dp))
-        Text(node.name, color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+        Text(node.name, color = Ink, fontSize = 18.sp, modifier = Modifier.weight(1f))
         if (selected) {
-            CheckIcon()
+            CheckIcon(color = Accent)
         } else {
             Box(
                 Modifier
@@ -157,16 +191,21 @@ private fun ToggleRow(title: String, checked: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                val s = if (focused) 1.03f else 1f
+                scaleX = s
+                scaleY = s
+            }
+            .shadow(if (focused) 14.dp else 2.dp, RoundedCornerShape(14.dp))
             .clip(RoundedCornerShape(14.dp))
             .background(Card)
-            .border(2.dp, if (focused) Accent else Color.Transparent, RoundedCornerShape(14.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .border(if (focused) 5.dp else 1.5.dp, if (focused) FocusRing else BorderIdle, RoundedCornerShape(14.dp))
+            .tvClickable(interaction, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
-        val track = if (checked) Accent else Color(0xFF3A4154)
+        Text(title, color = Ink, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        val track = if (checked) Accent else Color(0xFFD1D5DB)
         Box(
             Modifier
                 .width(48.dp)
@@ -187,16 +226,25 @@ private fun HttpEditRow(enabled: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                val s = if (focused) 1.03f else 1f
+                scaleX = s
+                scaleY = s
+            }
+            .shadow(if (focused) 14.dp else 2.dp, RoundedCornerShape(14.dp))
             .clip(RoundedCornerShape(14.dp))
             .background(Card)
-            .border(2.dp, if (focused || enabled) Accent else Color.Transparent, RoundedCornerShape(14.dp))
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .border(
+                if (focused) 5.dp else 1.5.dp,
+                if (focused) FocusRing else if (enabled) Accent else BorderIdle,
+                RoundedCornerShape(14.dp),
+            )
+            .tvClickable(interaction, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("开启 HTTP 编辑", color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
-        PencilIcon()
+        Text("开启 HTTP 编辑", color = Ink, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        PencilIcon(color = if (enabled) Accent else Ink)
     }
 }
 
@@ -206,12 +254,13 @@ private fun HttpPanel(state: SettingsUiState) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Card.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+                .background(Card, RoundedCornerShape(18.dp))
+                .border(1.5.dp, BorderIdle, RoundedCornerShape(18.dp))
                 .padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "HTTP 编辑未开启。打开后可在同一局域网用浏览器管理节点。",
+                "HTTP 编辑未开启。打开后可在同一局域网用浏览器导入节点。",
                 color = TextMuted,
                 fontSize = 16.sp,
             )
@@ -222,13 +271,13 @@ private fun HttpPanel(state: SettingsUiState) {
         Modifier
             .fillMaxSize()
             .background(Card, RoundedCornerShape(18.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(18.dp))
+            .border(1.5.dp, BorderIdle, RoundedCornerShape(18.dp))
             .padding(22.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            GlobeIcon()
+            GlobeIcon(color = Accent)
             Spacer(Modifier.width(10.dp))
-            Text("HTTP 编辑已开启", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text("HTTP 编辑已开启", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(18.dp))
         Column(
@@ -238,7 +287,7 @@ private fun HttpPanel(state: SettingsUiState) {
                 .padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(state.httpUrl, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            Text(state.httpUrl, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(16.dp))
             val qr = remember(state.httpUrl) { qrImage(state.httpUrl) }
             Image(
@@ -260,11 +309,16 @@ private fun FocusableIcon(onClick: () -> Unit, icon: @Composable () -> Unit) {
     val focused by interaction.collectIsFocusedAsState()
     Box(
         Modifier
-            .size(44.dp)
+            .size(48.dp)
+            .graphicsLayer {
+                val s = if (focused) 1.08f else 1f
+                scaleX = s
+                scaleY = s
+            }
             .clip(CircleShape)
-            .border(if (focused) 2.dp else 0.dp, Accent, CircleShape)
-            .focusable(interactionSource = interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .background(Card)
+            .border(if (focused) 5.dp else 1.5.dp, if (focused) FocusRing else BorderIdle, CircleShape)
+            .tvClickable(interaction, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { icon() }
 }

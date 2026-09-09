@@ -30,24 +30,17 @@ async function api(path, options) {
 function demoData() {
   state.demo = true;
   state.status = {
-    running: true,
-    usingStub: true,
-    selectedNodeId: 2,
-    selectedNodeName: "香港-2",
+    running: false,
+    usingStub: false,
+    selectedNodeId: null,
+    selectedNodeName: null,
     allowInsecureSsl: false,
     httpEditEnabled: true,
     lanUrl: location.origin,
     message: "预览模式（未连接设备 API）",
   };
-  state.nodes = [
-    { id: 1, name: "香港节点 01", protocol: "VLESS", host: "hk01.example.com", port: 443, latencyMs: 32, online: true, selected: false, source: "MANUAL" },
-    { id: 2, name: "香港-2", protocol: "VMess", host: "hk-2.example.com", port: 443, latencyMs: 68, online: true, selected: true, source: "SEED" },
-    { id: 3, name: "新加坡-1", protocol: "VLESS", host: "sg-1.example.com", port: 443, latencyMs: 41, online: true, selected: false, source: "SEED" },
-  ];
-  state.subs = [
-    { id: 1, name: "机场订阅 A", url: "https://example.com/sub/a", enabled: true, lastUpdatedAt: Date.now() - 3600_000, nodeCount: 28 },
-    { id: 2, name: "机场订阅 B", url: "https://example.com/sub/b", enabled: false, lastUpdatedAt: Date.now() - 86400_000, nodeCount: 12 },
-  ];
+  state.nodes = [];
+  state.subs = [];
 }
 
 async function loadAll() {

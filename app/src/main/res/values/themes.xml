@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Passwall" parent="android:Theme.DeviceDefault.NoActionBar">
-        <item name="android:windowBackground">#070B14</item>
-        <item name="android:colorBackground">#070B14</item>
-        <item name="android:statusBarColor">#070B14</item>
-        <item name="android:navigationBarColor">#070B14</item>
+    <style name="Theme.Passwall" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowBackground">#F5F5F7</item>
+        <item name="android:colorBackground">#F5F5F7</item>
+        <item name="android:statusBarColor">#F5F5F7</item>
+        <item name="android:navigationBarColor">#F5F5F7</item>
         <item name="android:windowFullscreen">true</item>
+        <item name="android:colorFocusedHighlight">#3478F6</item>
     </style>
 </resources>

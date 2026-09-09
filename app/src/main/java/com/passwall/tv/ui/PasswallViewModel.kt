@@ -9,7 +9,6 @@ import com.passwall.data.model.AppSettings
 import com.passwall.data.model.ProxyNode
 import com.passwall.tv.PasswallApp
 import com.passwall.tv.vpn.ProxyRuntime
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -20,7 +19,7 @@ data class HomeUiState(
     val running: Boolean = false,
     val statusOk: Boolean = false,
     val statusText: String = "",
-    val pendingVpnPrepare: Boolean = false,
+    val hasNode: Boolean = false,
     val error: String? = null,
 )
 
@@ -35,23 +34,22 @@ data class SettingsUiState(
 
 class PasswallViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as PasswallApp
-    private val pendingPrepare = MutableStateFlow(false)
 
     val home: StateFlow<HomeUiState> = combine(
         ProxyRuntime.isRunning,
         ProxyRuntime.statusOk,
         ProxyRuntime.statusMessage,
         ProxyRuntime.lastError,
-        pendingPrepare,
-    ) { running, ok, message, error, prepare ->
+        app.repository.nodesFlow,
+    ) { running, ok, message, error, nodes ->
         HomeUiState(
             running = running,
             statusOk = ok,
             statusText = message,
-            pendingVpnPrepare = prepare,
+            hasNode = nodes.isNotEmpty(),
             error = error,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState())
 
     val settings: StateFlow<SettingsUiState> = combine(
         app.repository.nodesFlow,
@@ -60,21 +58,13 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
         syncAdmin(prefs)
         SettingsUiState(
             nodes = nodes,
-            selectedNodeId = prefs.selectedNodeId ?: nodes.getOrNull(1)?.id ?: nodes.firstOrNull()?.id,
+            selectedNodeId = prefs.selectedNodeId,
             allowInsecure = prefs.allowInsecureSsl,
             httpEditEnabled = prefs.httpEditEnabled,
             httpUrl = if (prefs.httpEditEnabled) LanAddress.httpUrl(prefs.httpPort) else null,
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
-
-    fun requestStart() {
-        pendingPrepare.value = true
-    }
-
-    fun consumeVpnPrepare() {
-        pendingPrepare.value = false
-    }
 
     fun selectNode(id: Long) {
         viewModelScope.launch { app.repository.selectNode(id) }
@@ -92,7 +82,7 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val node = app.repository.getSelectedNode()
             if (node == null) {
-                ProxyRuntime.markTest(false, "未选择节点")
+                ProxyRuntime.markTest(false, "请先在设置或网页导入节点")
                 return@launch
             }
             if (app.engine.isRunning()) {

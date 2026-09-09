@@ -15,5 +15,5 @@
     <string name="http_edit_off">HTTP 编辑未开启。打开后可在同一局域网用浏览器管理节点。</string>
     <string name="vpn_notification_channel">Passwall 代理</string>
     <string name="vpn_notification_title">Passwall 正在运行</string>
-    <string name="no_node">请先在设置中选择节点</string>
+    <string name="no_node">请先在设置或网页导入节点</string>
 </resources>

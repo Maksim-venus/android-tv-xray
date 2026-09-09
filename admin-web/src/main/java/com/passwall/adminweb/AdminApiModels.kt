@@ -11,7 +11,7 @@ data class StatusDto(
     val allowInsecureSsl: Boolean,
     val httpEditEnabled: Boolean,
     val lanUrl: String,
-    val version: String = "0.1.0",
+    val version: String = "0.1.1",
     val message: String = "",
     val routingAssetsUpdatedAt: Long? = null,
 )

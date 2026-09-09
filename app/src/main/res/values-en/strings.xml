@@ -15,5 +15,5 @@
     <string name="http_edit_off">HTTP editing is off. Enable it to manage nodes from a browser on the LAN.</string>
     <string name="vpn_notification_channel">Passwall proxy</string>
     <string name="vpn_notification_title">Passwall is running</string>
-    <string name="no_node">Select a node in Settings first</string>
+    <string name="no_node">Import a node in Settings or the web admin first</string>
 </resources>

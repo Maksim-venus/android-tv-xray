@@ -3,36 +3,40 @@ package com.passwall.tv.ui.theme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 
-val Navy = Color(0xFF070B14)
-val Navy2 = Color(0xFF0C1424)
-val Card = Color(0xFF141B2B)
-val Card2 = Color(0xFF1A2234)
-val Accent = Color(0xFF2F7BFF)
-val AccentSoft = Color(0xFF3B82F6)
-val VlessPurple = Color(0xFF7C5CFF)
-val VmessBlue = Color(0xFF2F6BFF)
-val OnlineGreen = Color(0xFF22C55E)
-val TextPrimary = Color(0xFFFFFFFF)
-val TextMuted = Color(0xFF8B93A7)
-val BorderIdle = Color(0x33FFFFFF)
-val FocusGlow = Color(0xFF3B82F6)
+/** Clash for Windows / Clash Verge light palette. */
+val Canvas = Color(0xFFF5F5F7)
+val Canvas2 = Color(0xFFEEEEF1)
+val Card = Color(0xFFFFFFFF)
+val Card2 = Color(0xFFFAFAFC)
+val Accent = Color(0xFF3478F6)
+val AccentSoft = Color(0xFF2B7CD3)
+val FocusRing = Color(0xFF3478F6)
+val VlessPurple = Color(0xFF5B6CFF)
+val VmessBlue = Color(0xFF2B7CD3)
+val OnlineGreen = Color(0xFF17A65A)
+val Danger = Color(0xFFE5484D)
+val Ink = Color(0xFF1F2328)
+val TextPrimary = Ink
+val TextMuted = Color(0xFF6B7280)
+val BorderIdle = Color(0xFFD8DCE3)
+val FocusGlow = FocusRing
 
-private val scheme = darkColorScheme(
+private val scheme = lightColorScheme(
     primary = Accent,
-    background = Navy,
+    background = Canvas,
     surface = Card,
     onPrimary = Color.White,
-    onBackground = TextPrimary,
-    onSurface = TextPrimary,
+    onBackground = Ink,
+    onSurface = Ink,
+    error = Danger,
+    onError = Color.White,
 )
 
 @Composable
@@ -46,22 +50,7 @@ fun PasswallTheme(content: @Composable () -> Unit) {
         Box(
             Modifier
                 .fillMaxSize()
-                .drawBehind {
-                    drawRect(
-                        Brush.verticalGradient(
-                            listOf(Navy, Navy2, Color(0xFF080D18)),
-                            startY = 0f,
-                            endY = size.height,
-                        ),
-                    )
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Color(0x332F7BFF), Color.Transparent),
-                            center = Offset(size.width * 0.5f, size.height * 0.55f),
-                            radius = size.minDimension * 0.55f,
-                        ),
-                    )
-                },
+                .drawBehind { drawRect(Canvas) },
         ) {
             content()
         }
