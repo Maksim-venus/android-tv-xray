@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
+            com.passwall.data.log.RuntimeLog.info("VPN 权限已授予", "vpn")
             ProxyRuntime.startService(this)
         } else {
             val msg = "未授予 VPN 权限，无法启动。请再按「启动」并选择允许。"
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
         try {
             val prepare = VpnService.prepare(this)
             if (prepare != null) {
+                com.passwall.data.log.RuntimeLog.info("已弹出系统 VPN 授权", "vpn")
                 ProxyRuntime.markMessage("请允许 VPN 权限")
                 ProxyRuntime.toast(this, "请允许 VPN 权限")
                 vpnPermissionLauncher.launch(prepare)

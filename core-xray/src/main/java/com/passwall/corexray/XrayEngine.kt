@@ -5,6 +5,7 @@ import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.passwall.data.log.RuntimeLog
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
@@ -101,6 +102,7 @@ class Libv2rayEngine : XrayEngine {
                 usingStub = false,
                 coreVersion = versionOrUnknown(),
             )
+            RuntimeLog.error("Xray 启动失败：${t.message ?: t.javaClass.simpleName}", "xray")
             throw t
         }
         running.set(true)
@@ -113,6 +115,7 @@ class Libv2rayEngine : XrayEngine {
             coreVersion = versionOrUnknown(),
         )
         Log.i(TAG, "started ${versionOrUnknown()} tunFd=${tun.fd}")
+        RuntimeLog.info("Xray 已运行 ${versionOrUnknown()} tunFd=${tun.fd}", "xray")
     }
 
     @Synchronized

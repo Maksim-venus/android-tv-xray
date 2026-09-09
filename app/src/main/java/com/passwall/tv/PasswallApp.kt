@@ -8,6 +8,7 @@ import com.passwall.corexray.RoutingAssetStore
 import com.passwall.corexray.RoutingAssetUpdater
 import com.passwall.corexray.XrayEngine
 import com.passwall.data.db.AppDatabase
+import com.passwall.data.log.RuntimeLog
 import com.passwall.data.repo.PasswallRepository
 import com.passwall.tv.vpn.ProxyRuntime
 import kotlinx.coroutines.CoroutineScope
@@ -49,6 +50,7 @@ class PasswallApp : Application() {
                 stopProxy = { ProxyRuntime.requestStopFromApp(this) },
             ),
         )
+        RuntimeLog.info("Passwall 已启动", "app")
         appScope.launch { repository.ensureSettings() }
     }
 

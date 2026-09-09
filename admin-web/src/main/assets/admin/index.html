@@ -19,6 +19,7 @@
       <button class="nav-item active" data-view="nodes">节点</button>
       <button class="nav-item" data-view="subs">订阅</button>
       <button class="nav-item" data-view="system">系统</button>
+      <button class="nav-item" data-view="logs">日志</button>
     </nav>
     <div class="sidebar-status">
       <div class="run-line">
@@ -26,7 +27,8 @@
         <span>运行状态</span>
       </div>
       <div id="runText">Passwall 已停止</div>
-      <div class="ver">v0.1.1</div>
+      <div id="lastErrorBox" class="last-error hidden"></div>
+      <div class="ver">v0.1.2</div>
     </div>
   </aside>
 
@@ -108,10 +110,26 @@
           <span>分流规则更新</span>
           <code id="sysGeo">尚未更新（使用 APK 内置）</code>
         </div>
+        <div id="sysError" class="last-error hidden"></div>
         <div class="row actions">
           <button class="btn primary" id="btnStart">启动代理</button>
           <button class="btn" id="btnStop">停止代理</button>
         </div>
+      </div>
+    </section>
+
+    <section id="view-logs" class="view hidden">
+      <div class="toolbar">
+        <label class="chk"><input type="checkbox" id="logErrorsOnly" /> 只看错误</label>
+        <button class="btn" id="btnRefreshLogs">刷新</button>
+        <button class="btn" id="btnClearLogs">清空日志</button>
+        <div class="spacer"></div>
+        <span class="hint" id="logMeta">自动刷新中</span>
+      </div>
+      <div class="card">
+        <div class="card-title">运行日志</div>
+        <div id="logEmpty" class="empty hidden">暂无日志。启动代理或测试连通性后会出现记录。</div>
+        <ol id="logList" class="log-list"></ol>
       </div>
     </section>
   </main>

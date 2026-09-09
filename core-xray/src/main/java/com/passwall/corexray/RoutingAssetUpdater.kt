@@ -1,6 +1,7 @@
 package com.passwall.corexray
 
 import android.util.Log
+import com.passwall.data.log.RuntimeLog
 import com.passwall.data.model.AppSettings
 import com.passwall.data.repo.PasswallRepository
 
@@ -40,9 +41,11 @@ class RoutingAssetUpdater(
         return if (errors.isEmpty()) {
             runCatching { repository.setRoutingAssetsUpdatedAt(nowMs) }
             Log.i(TAG, "routing assets updated: $updated")
+            RuntimeLog.info("分流规则下载成功：${updated.joinToString()}", "geo")
             RoutingAssetUpdateResult(attempted = true, success = true, updatedFiles = updated)
         } else {
             Log.w(TAG, "routing asset update failed, keeping last-good: $errors")
+            RuntimeLog.warn("分流规则下载失败：$errors", "geo")
             RoutingAssetUpdateResult(
                 attempted = true,
                 success = false,

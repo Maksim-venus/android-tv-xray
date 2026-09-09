@@ -1,5 +1,6 @@
 package com.passwall.adminweb
 
+import com.passwall.data.log.RuntimeLogEntry
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -11,9 +12,17 @@ data class StatusDto(
     val allowInsecureSsl: Boolean,
     val httpEditEnabled: Boolean,
     val lanUrl: String,
-    val version: String = "0.1.1",
+    val version: String = "0.1.2",
     val message: String = "",
     val routingAssetsUpdatedAt: Long? = null,
+    val lastError: String? = null,
+    val lastErrorAt: Long? = null,
+)
+
+@Serializable
+data class LogsDto(
+    val items: List<RuntimeLogEntry>,
+    val latestError: RuntimeLogEntry? = null,
 )
 
 @Serializable

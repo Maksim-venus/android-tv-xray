@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import com.passwall.corexray.XrayConfigGenerator
+import com.passwall.data.log.RuntimeLog
 import com.passwall.tv.BuildConfig
 import com.passwall.tv.MainActivity
 import com.passwall.tv.PasswallApp
@@ -64,14 +65,29 @@ class ProxyVpnService : VpnService() {
             // Avoid API 29+ Builder helpers so the same path stays valid on Android 9 / kernel 4.x.
             tun?.close()
             tun = builder.establish()
+            if (tun == null) {
+                ProxyRuntime.markError("系统未能建立 VPN 通道（TUN 为空）")
+                stopSelf()
+                return
+            }
+            generated.notes.forEach { RuntimeLog.warn("配置：$it", "xray") }
             app.engine.start(generated, configFile, tun)
             ProxyRuntime.markStarted(getString(R.string.proxy_ok))
             // Never block start: refresh geoip/geosite in the background.
             scope.launch {
-                runCatching { app.assetUpdater.refreshAfterSuccessfulStart() }
+                val geo = runCatching { app.assetUpdater.refreshAfterSuccessfulStart() }
+                    .getOrElse {
+                        RuntimeLog.warn("分流规则更新异常：${it.message}", "geo")
+                        return@launch
+                    }
+                when {
+                    !geo.attempted -> RuntimeLog.info("分流规则未到期，跳过更新", "geo")
+                    geo.success -> RuntimeLog.info("分流规则已更新：${geo.updatedFiles.joinToString()}", "geo")
+                    else -> RuntimeLog.warn("分流规则更新失败，沿用上次文件：${geo.error}", "geo")
+                }
             }
         } catch (t: Throwable) {
-            ProxyRuntime.markError(t.message ?: t.javaClass.simpleName)
+            ProxyRuntime.markError("配置或引擎启动失败：${t.message ?: t.javaClass.simpleName}")
             stopSelf()
         }
     }

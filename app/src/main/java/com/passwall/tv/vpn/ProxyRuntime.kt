@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.widget.Toast
+import com.passwall.data.log.RuntimeLog
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -35,16 +36,19 @@ object ProxyRuntime {
         _statusOk.value = true
         _lastError.value = null
         pendingStart = false
+        RuntimeLog.info("VPN 已启动：$message", "vpn")
     }
 
     fun markStopped(message: String = "") {
         _isRunning.value = false
         _statusMessage.value = message
         _statusOk.value = false
+        RuntimeLog.info("VPN 已停止" + if (message.isBlank()) "" else "：$message", "vpn")
     }
 
     fun markMessage(message: String) {
         _statusMessage.value = message
+        RuntimeLog.info(message, "vpn")
     }
 
     fun markError(message: String) {
@@ -52,12 +56,19 @@ object ProxyRuntime {
         _statusMessage.value = message
         _statusOk.value = false
         _lastError.value = message
+        RuntimeLog.error(message, "vpn")
     }
 
     fun markTest(ok: Boolean, message: String) {
         _statusOk.value = ok
         _statusMessage.value = message
-        if (!ok) _lastError.value = message else _lastError.value = null
+        if (!ok) {
+            _lastError.value = message
+            RuntimeLog.warn("连通性测试：$message", "test")
+        } else {
+            _lastError.value = null
+            RuntimeLog.info("连通性测试：$message", "test")
+        }
     }
 
     fun toast(context: Context, message: String, long: Boolean = true) {
@@ -85,6 +96,7 @@ object ProxyRuntime {
             } else {
                 context.startService(intent)
             }
+            RuntimeLog.info("正在启动 VpnService", "vpn")
             markMessage("正在启动代理…")
         } catch (t: Throwable) {
             val msg = "无法启动服务：${t.message ?: t.javaClass.simpleName}"

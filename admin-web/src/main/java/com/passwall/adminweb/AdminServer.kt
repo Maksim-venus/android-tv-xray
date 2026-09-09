@@ -1,6 +1,7 @@
 package com.passwall.adminweb
 
 import android.content.Context
+import com.passwall.data.log.RuntimeLog
 import com.passwall.data.repo.PasswallRepository
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -79,6 +80,7 @@ class AdminServer(
                     get("/status") {
                         val settings = repository.getSettings()
                         val selected = repository.getSelectedNode()
+                        val err = RuntimeLog.latestError()
                         call.respond(
                             StatusDto(
                                 running = runtime.isRunning(),
@@ -90,8 +92,24 @@ class AdminServer(
                                 lanUrl = LanAddress.httpUrl(settings.httpPort),
                                 message = runtime.statusMessage(),
                                 routingAssetsUpdatedAt = settings.routingAssetsUpdatedAt,
+                                lastError = err?.message,
+                                lastErrorAt = err?.at,
                             ),
                         )
+                    }
+                    get("/logs") {
+                        val level = call.request.queryParameters["level"]
+                        call.respond(
+                            LogsDto(
+                                items = RuntimeLog.snapshot(newestFirst = true, level = level),
+                                latestError = RuntimeLog.latestError(),
+                            ),
+                        )
+                    }
+                    delete("/logs") {
+                        RuntimeLog.clear()
+                        RuntimeLog.info("日志已清空", "admin")
+                        call.respond(OkDto())
                     }
                     get("/nodes") {
                         val selectedId = repository.getSettings().selectedNodeId
@@ -114,6 +132,10 @@ class AdminServer(
                     post("/nodes/import") {
                         val req = call.receive<ImportRequest>()
                         val result = repository.importLinks(req.text)
+                        RuntimeLog.info("导入节点 ${result.nodes.size} 条", "admin")
+                        if (result.errors.isNotEmpty()) {
+                            RuntimeLog.warn("导入失败 ${result.errors.size} 条：${result.errors.take(3).joinToString()}", "admin")
+                        }
                         call.respond(ImportResponse(result.nodes.size, result.errors))
                     }
                     post("/nodes/{id}/select") {
@@ -190,10 +212,12 @@ class AdminServer(
                         call.respond(OkDto())
                     }
                     post("/proxy/start") {
+                        RuntimeLog.info("网页请求启动代理", "admin")
                         runtime.startProxy()
                         call.respond(OkDto())
                     }
                     post("/proxy/stop") {
+                        RuntimeLog.info("网页请求停止代理", "admin")
                         runtime.stopProxy()
                         call.respond(OkDto())
                     }

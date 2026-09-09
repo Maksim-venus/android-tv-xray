@@ -2,6 +2,7 @@ const state = {
   nodes: [],
   subs: [],
   status: null,
+  logs: [],
   view: "nodes",
   modalMode: "import",
   demo: false,
@@ -41,6 +42,7 @@ function demoData() {
   };
   state.nodes = [];
   state.subs = [];
+  state.logs = [];
 }
 
 async function loadAll() {
@@ -48,12 +50,29 @@ async function loadAll() {
     state.status = await api("/api/status");
     state.nodes = await api("/api/nodes");
     state.subs = await api("/api/subscriptions");
+    await loadLogs();
     state.demo = false;
   } catch (err) {
     demoData();
     toast("当前为静态预览，API 将在电视端 Ktor 服务中可用");
   }
   render();
+}
+
+async function loadLogs() {
+  try {
+    const onlyErr = $("logErrorsOnly")?.checked;
+    const q = onlyErr ? "?level=error" : "";
+    const data = await api("/api/logs" + q);
+    state.logs = data.items || [];
+    if (data.latestError && state.status) {
+      state.status.lastError = data.latestError.message;
+      state.status.lastErrorAt = data.latestError.at;
+    }
+  } catch {
+    if (!state.demo) return;
+    state.logs = [];
+  }
 }
 
 function render() {
@@ -69,6 +88,16 @@ function render() {
   $("sysGeo").textContent = state.status?.routingAssetsUpdatedAt
     ? new Date(state.status.routingAssetsUpdatedAt).toLocaleString()
     : "尚未更新（使用 APK 内置）";
+  const err = state.status?.lastError;
+  const showErr = !running && !!err;
+  const errText = showErr ? `启动失败：${err}` : "";
+  ["lastErrorBox", "sysError"].forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = errText;
+    el.classList.toggle("hidden", !showErr);
+  });
+  renderLogs();
 
   const q = ($("search").value || "").toLowerCase();
   const proto = $("protoFilter").value;
@@ -106,6 +135,33 @@ function render() {
   $("subList").innerHTML = subHtml;
   $("subList2").innerHTML = subHtml || "";
   $("subEmpty").classList.toggle("hidden", (state.subs || []).length > 0);
+}
+
+function renderLogs() {
+  const list = $("logList");
+  const empty = $("logEmpty");
+  if (!list) return;
+  const items = state.logs || [];
+  empty?.classList.toggle("hidden", items.length > 0);
+  list.innerHTML = items.map((e) => {
+    const t = formatTime(e.at);
+    const lvl = e.level === "error" ? "错误" : e.level === "warn" ? "警告" : "信息";
+    return `<li class="log-line ${escapeHtml(e.level)}">
+      <span class="log-time">${t}</span>
+      <span class="log-lvl">${lvl}</span>
+      <span class="log-src">${escapeHtml(e.source || "")}</span>
+      <span class="log-msg">${escapeHtml(e.message)}</span>
+    </li>`;
+  }).join("");
+  const meta = $("logMeta");
+  if (meta) meta.textContent = items.length ? `${items.length} 条 · 每 4 秒刷新` : "自动刷新中";
+}
+
+function formatTime(ms) {
+  if (!ms) return "—";
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 function escapeHtml(s) {
@@ -149,13 +205,52 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     state.view = btn.dataset.view;
     document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b === btn));
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
-    $("view-" + (state.view === "subs" ? "subs" : state.view === "system" ? "system" : "nodes")).classList.remove("hidden");
-    $("pageTitle").textContent = state.view === "subs" ? "订阅管理" : state.view === "system" ? "系统" : "节点管理";
+    const viewId = state.view === "subs" ? "subs"
+      : state.view === "system" ? "system"
+      : state.view === "logs" ? "logs"
+      : "nodes";
+    $("view-" + viewId).classList.remove("hidden");
+    $("pageTitle").textContent = ({
+      subs: "订阅管理",
+      system: "系统",
+      logs: "日志",
+    })[state.view] || "节点管理";
     $("pageSub").textContent = state.view === "system"
       ? "代理启停、不安全 SSL 与 HTTP 编辑开关"
-      : "集中管理您的代理节点、订阅与网络配置";
+      : state.view === "logs"
+        ? "VPN / Xray 运行记录，便于手机浏览器排查"
+        : "集中管理您的代理节点、订阅与网络配置";
+    if (state.view === "logs") loadLogs().then(renderLogs);
   });
 });
+
+$("logErrorsOnly")?.addEventListener("change", async () => {
+  await loadLogs();
+  renderLogs();
+});
+$("btnRefreshLogs")?.addEventListener("click", async () => {
+  await loadLogs();
+  render();
+});
+$("btnClearLogs")?.addEventListener("click", async () => {
+  try {
+    await api("/api/logs", { method: "DELETE" });
+    await loadLogs();
+    render();
+    toast("日志已清空");
+  } catch (e) {
+    toast(state.demo ? "预览模式无法清空" : e.message);
+  }
+});
+
+setInterval(async () => {
+  if (state.demo) return;
+  try {
+    state.status = await api("/api/status");
+    if (state.view === "logs" || state.status?.lastError) await loadLogs();
+    render();
+  } catch { /* keep last snapshot */ }
+}, 4000);
 
 $("btnImport").onclick = () => showModal("import");
 $("btnAddSub").onclick = () => showModal("sub");
