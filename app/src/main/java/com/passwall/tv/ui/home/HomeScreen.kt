@@ -167,12 +167,18 @@ private fun TestCluster(
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedAction(onClick = onTest, label = "测试")
         Row(verticalAlignment = Alignment.CenterVertically) {
+            val pending = text.isBlank() || text.contains("正在") || text == "尚未测试外网"
+            val dot = when {
+                pending -> TextMuted
+                ok -> OnlineGreen
+                else -> Danger
+            }
             Box(
                 Modifier
-                    .size(10.dp)
-                    .background(if (ok) OnlineGreen else Danger, CircleShape),
+                    .size(14.dp)
+                    .background(dot, CircleShape),
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
                 when {
                     text.isNotBlank() -> text
@@ -180,8 +186,9 @@ private fun TestCluster(
                     else -> "尚未测试外网"
                 },
                 color = Ink,
-                fontSize = 15.sp,
-                modifier = Modifier.widthIn(max = 360.dp),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.widthIn(max = 560.dp),
             )
         }
     }
@@ -196,7 +203,7 @@ private fun StatusBanner(state: HomeUiState, modifier: Modifier = Modifier) {
         !state.hasNode -> "请先在设置或网页导入节点"
         else -> null
     }
-    if (text.isNullOrBlank() && state.hasNode && !state.running) return
+    if (text.isNullOrBlank()) return
     val color = if (!error.isNullOrBlank() || !state.hasNode) Danger else TextMuted
     Text(
         text = text ?: "",

@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
             val prepare = VpnService.prepare(this)
             if (prepare != null) {
                 com.passwall.data.log.RuntimeLog.info("已弹出系统 VPN 授权", "vpn")
-                ProxyRuntime.markMessage("请允许 VPN 权限")
+                ProxyRuntime.markMessage("请允许 VPN 权限", autoClear = true)
                 ProxyRuntime.toast(this, "请允许 VPN 权限")
                 vpnPermissionLauncher.launch(prepare)
             } else {

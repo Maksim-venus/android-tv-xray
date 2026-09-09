@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/dist"
-VERSION="${1:-0.1.5}"
+VERSION="${1:-0.1.6}"
 mkdir -p "$DEST"
 legacy="$ROOT/app/build/outputs/apk/legacy/release/app-legacy-release.apk"
 modern="$ROOT/app/build/outputs/apk/modern/release/app-modern-release.apk"

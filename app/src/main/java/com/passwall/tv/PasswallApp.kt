@@ -14,6 +14,8 @@ import com.passwall.tv.vpn.ProxyRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class PasswallApp : Application() {
@@ -70,12 +72,21 @@ class PasswallApp : Application() {
                         url = result.url,
                         error = result.error,
                         message = result.message,
+                        exitIp = result.exitIp,
+                        country = result.country,
+                        flag = result.flag,
                     )
                 },
             ),
         )
         RuntimeLog.info("Passwall 已启动", "app")
         appScope.launch { repository.ensureSettings() }
+        appScope.launch {
+            while (isActive) {
+                RuntimeLog.prune()
+                delay(60 * 60 * 1000L)
+            }
+        }
     }
 
     companion object {

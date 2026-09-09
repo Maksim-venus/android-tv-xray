@@ -98,6 +98,7 @@ class AdminServer(
                         )
                     }
                     get("/logs") {
+                        RuntimeLog.prune()
                         val level = call.request.queryParameters["level"]
                         call.respond(
                             LogsDto(
@@ -232,6 +233,9 @@ class AdminServer(
                                 url = result.url,
                                 error = result.error,
                                 message = result.message,
+                                exitIp = result.exitIp,
+                                country = result.country,
+                                flag = result.flag,
                             ),
                         )
                     }

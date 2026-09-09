@@ -12,7 +12,7 @@ data class StatusDto(
     val allowInsecureSsl: Boolean,
     val httpEditEnabled: Boolean,
     val lanUrl: String,
-    val version: String = "0.1.5",
+    val version: String = "0.1.6",
     val xrayCore: String = "26.1.13 / v1.260113.0",
     val message: String = "",
     val routingAssetsUpdatedAt: Long? = null,
@@ -95,4 +95,7 @@ data class ProbeDto(
     val url: String? = null,
     val error: String? = null,
     val message: String = "",
+    val exitIp: String? = null,
+    val country: String? = null,
+    val flag: String? = null,
 )

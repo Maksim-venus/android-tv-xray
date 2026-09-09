@@ -12,17 +12,17 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 | 电视 / 盒子 | 选这个文件 |
 | --- | --- |
-| **Android 9 / 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.5.apk`（包名 `com.passwall.tv.legacy`） |
-| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.5.apk`（包名 `com.passwall.tv`） |
+| **Android 9 / 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.6.apk`（包名 `com.passwall.tv.legacy`） |
+| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.6.apk`（包名 `com.passwall.tv`） |
 
 不确定就先装 **legacy**。两个可以同时装（包名不同）。
 
 成品路径（本机构建后，可直接拷走安装）：
 
-- `/workspace/dist/Passwall-TV-legacy-0.1.5.apk`
-- `/workspace/dist/Passwall-TV-modern-0.1.5.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.5.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.5.apk`
+- `/workspace/dist/Passwall-TV-legacy-0.1.6.apk`
+- `/workspace/dist/Passwall-TV-modern-0.1.6.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.6.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.6.apk`
 - 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
 - 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
 
@@ -38,9 +38,9 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 ```bash
 adb connect 电视IP:5555
-adb install -r dist/Passwall-TV-legacy-0.1.5.apk
+adb install -r dist/Passwall-TV-legacy-0.1.6.apk
 # 或
-adb install -r dist/Passwall-TV-modern-0.1.5.apk
+adb install -r dist/Passwall-TV-modern-0.1.6.apk
 ```
 
 ### 3. 第一次使用
@@ -54,7 +54,7 @@ adb install -r dist/Passwall-TV-modern-0.1.5.apk
 5. 点 **导入链接**，粘贴你的 `vless://` 或 `vmess://`（一行一条），点导入。
 6. 回到电视，在节点列表里选中刚导入的节点（蓝勾）。
 7. 返回首页，点中间 **启动**，同意系统 VPN 授权。
-8. 运行后点右下角 **测试**：经本地 SOCKS `127.0.0.1:10808` → Xray 出站，向 `https://www.gstatic.com/generate_204`（失败再试 Google / Cloudflare）发真实 HTTPS 请求。成功条件是 HTTP **204 或 200**。首页不会把「启动成功」或 `measureDelay` 显示成「代理正常」。
+8. 运行后点右下角 **测试**：经本地 SOCKS `127.0.0.1:10808` → Xray 出站，查询 `https://ipinfo.io/json` 的**出口 IP** 与国家代码，首页显示如 `🇯🇵 出口 1.2.3.4 · 62 ms`。ipinfo 失败时才回退 `generate_204`。状态栏 / Toast / 成功失败提示约 **5 秒后自动消失**。
 9. 点 **停止** 会立刻停 Xray 并拆掉 TUN；失败会 Toast + 底部中文 + 网页日志，不会静默无反应。
 
 全新安装**没有预置节点**。未导入时点「启动」会提示「请先在设置或网页导入节点」。
@@ -67,12 +67,12 @@ adb install -r dist/Passwall-TV-modern-0.1.5.apk
 
 | Device | APK |
 | --- | --- |
-| Android 9 / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.5.apk` |
-| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.5.apk` |
+| Android 9 / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.6.apk` |
+| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.6.apk` |
 
 Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an empty node list. Enable HTTP edit on the TV, import `vless://` / `vmess://` from a phone on the same LAN, select the node, press 启动, accept the VPN dialog.
 
-**测试** is a real HTTPS GET through the Xray SOCKS inbound (not a TUN-direct request from the app process, and not `measureDelay` alone). Success = HTTP 204/200 from a `generate_204` URL.
+**测试** is a real HTTPS GET through the Xray SOCKS inbound (not a TUN-direct request from the app process, and not `measureDelay` alone). Primary target is `ipinfo.io` (exit IP + country flag). `generate_204` is fallback only. TV status / Toast auto-clear after 5 seconds. Web logs keep 7 days.
 
 Pinned core **Xray v1.260113.0** still honors `tlsSettings.allowInsecure`. Official 1.8.3 AARs cannot drive this app’s TUN `startLoop` path.
 
@@ -85,7 +85,7 @@ Pinned core **Xray v1.260113.0** still honors `tlsSettings.allowInsecure`. Offic
 - ChinaDNS-style split: `geosite:cn` / `geoip:cn` / private → direct; else → VLESS/VMess.
 - TLS: when the insecure toggle is on, emit `allowInsecure: true`. Do not emit `verifyPeerCertByName` (this core uses `verifyPeerCertInNames`). Optional `pcs` → `pinnedPeerCertSha256`.
 - Bundled **official Loyalsoldier** `geosite.dat` (must contain `cn`; compact generate-geosite.py is banned) plus `geoip-only-cn-private`. Invalid runtime files are replaced. If Xray still rejects geosite, start retries with IP-only `geoip:cn` rules. 7-day refresh after a successful start.
-- Local Passwall-like web admin when HTTP edit is on. Sidebar **日志** shows VPN/Xray ring-buffer lines (`GET /api/logs`), auto-refresh, error filter, clear. **外网探测** is `POST /api/proxy/probe` (HTTPS via SOCKS, not TCP ping). Latest start failure is shown on the admin status panel.
+- Local Passwall-like web admin when HTTP edit is on. Sidebar **日志** shows VPN/Xray ring-buffer lines (`GET /api/logs`), auto-refresh, error filter, clear; entries older than **7 days** are pruned on write and hourly. **外网探测** is `POST /api/proxy/probe` (ipinfo.io via SOCKS; returns `exitIp` / `country` / `flag`). Latest start failure is shown on the admin status panel.
 - Licenses: [THIRD_PARTY.md](THIRD_PARTY.md). Native notes: [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md).
 
 ### Dual APK (developers)

@@ -1,6 +1,8 @@
 package com.passwall.tv.vpn
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
 import com.passwall.data.log.RuntimeLog
 import com.passwall.tv.PasswallApp
@@ -11,8 +13,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 object ProxyRuntime {
+    const val HINT_TTL_MS = 5_000L
+
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
@@ -31,6 +36,9 @@ object ProxyRuntime {
     var pendingStart: Boolean = false
 
     private val stopInFlight = AtomicBoolean(false)
+    private val hintGeneration = AtomicInteger(0)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var currentToast: Toast? = null
 
     private val _startRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val startRequests: SharedFlow<Unit> = _startRequests.asSharedFlow()
@@ -45,6 +53,7 @@ object ProxyRuntime {
         _statusMessage.value = message.ifBlank { "已启动，请点测试检查外网" }
         _lastError.value = null
         RuntimeLog.info("VPN 已启动：$message", "vpn")
+        scheduleHintClear()
     }
 
     fun markStopped(message: String = "已停止") {
@@ -55,11 +64,13 @@ object ProxyRuntime {
         _statusOk.value = false
         _statusMessage.value = message
         RuntimeLog.info("VPN 已停止" + if (message.isBlank()) "" else "：$message", "vpn")
+        scheduleHintClear()
     }
 
-    fun markMessage(message: String) {
+    fun markMessage(message: String, autoClear: Boolean = false) {
         _statusMessage.value = message
         RuntimeLog.info(message, "vpn")
+        if (autoClear) scheduleHintClear() else holdHint()
     }
 
     fun markError(message: String) {
@@ -71,12 +82,14 @@ object ProxyRuntime {
         _statusOk.value = false
         _lastError.value = message
         RuntimeLog.error(message, "vpn")
+        scheduleHintClear()
     }
 
     fun markTestProgress(message: String) {
         _statusOk.value = false
         _statusMessage.value = message
         RuntimeLog.info("连通性测试：$message", "test")
+        holdHint()
     }
 
     fun markTest(ok: Boolean, message: String) {
@@ -89,14 +102,20 @@ object ProxyRuntime {
             _lastError.value = null
             RuntimeLog.info("连通性测试：$message", "test")
         }
+        scheduleHintClear()
     }
 
     fun toast(context: Context, message: String, long: Boolean = true) {
-        Toast.makeText(
-            context.applicationContext,
-            message,
-            if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT,
-        ).show()
+        val app = context.applicationContext
+        val duration = if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+        mainHandler.post {
+            currentToast?.cancel()
+            val shown = Toast.makeText(app, message, duration)
+            currentToast = shown
+            shown.show()
+            mainHandler.removeCallbacks(dismissToast)
+            mainHandler.postDelayed(dismissToast, HINT_TTL_MS)
+        }
     }
 
     fun requestStartFromApp() {
@@ -121,6 +140,7 @@ object ProxyRuntime {
             try {
                 stopInFlight.set(true)
                 _isStopping.value = true
+                holdHint()
                 _statusMessage.value = "正在停止…"
                 app?.engine?.stop()
                 ProxyVpnService.requestStop(context)
@@ -139,6 +159,7 @@ object ProxyRuntime {
             _isStopping.value = true
             _isRunning.value = false
             _statusOk.value = false
+            holdHint()
             _statusMessage.value = "正在停止…"
             RuntimeLog.info("正在停止 VPN / Xray", "vpn")
             app?.engine?.stop()
@@ -170,5 +191,34 @@ object ProxyRuntime {
             markError(msg)
             toast(context, msg)
         }
+    }
+
+    private val clearHintsRunnable = Runnable {
+        if (_isStopping.value) return@Runnable
+        val msg = _statusMessage.value
+        if (msg.contains("正在")) return@Runnable
+        _statusMessage.value = ""
+        _statusOk.value = false
+        _lastError.value = null
+    }
+
+    private val dismissToast = Runnable {
+        currentToast?.cancel()
+        currentToast = null
+    }
+
+    private fun scheduleHintClear() {
+        val token = hintGeneration.incrementAndGet()
+        mainHandler.post {
+            mainHandler.removeCallbacks(clearHintsRunnable)
+            mainHandler.postDelayed({
+                if (hintGeneration.get() == token) clearHintsRunnable.run()
+            }, HINT_TTL_MS)
+        }
+    }
+
+    private fun holdHint() {
+        hintGeneration.incrementAndGet()
+        mainHandler.removeCallbacks(clearHintsRunnable)
     }
 }

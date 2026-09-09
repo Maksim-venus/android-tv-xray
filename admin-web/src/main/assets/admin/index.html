@@ -28,7 +28,7 @@
       </div>
       <div id="runText">Passwall 已停止</div>
       <div id="lastErrorBox" class="last-error hidden"></div>
-        <div class="ver">v0.1.5 · Xray 26.1.13</div>
+        <div class="ver">v0.1.6 · Xray 26.1.13</div>
     </div>
   </aside>
 
@@ -112,6 +112,10 @@
           <span>分流规则更新</span>
           <code id="sysGeo">尚未更新（使用 APK 内置）</code>
         </div>
+        <div class="row">
+          <span>出口 IP</span>
+          <code id="sysProbe">尚未探测（经代理查 ipinfo.io）</code>
+        </div>
         <div id="sysError" class="last-error hidden"></div>
         <div class="row actions">
           <button class="btn primary" id="btnStart">启动代理</button>
@@ -130,7 +134,8 @@
         <span class="hint" id="logMeta">自动刷新中</span>
       </div>
       <div class="card">
-        <div class="card-title">运行日志</div>
+        <div class="card-title">运行日志（仅保留 7 天）</div>
+        <p class="hint">写入与定时清理会丢掉 7 天以前的记录。「清空」仍会删除全部。</p>
         <div id="logEmpty" class="empty hidden">暂无日志。启动代理或测试连通性后会出现记录。</div>
         <ol id="logList" class="log-list"></ol>
       </div>
@@ -143,8 +148,8 @@
       <li>支持批量导入，每行一条分享链接。</li>
       <li>导入的节点会归入「手动导入」。</li>
       <li>请使用「订阅管理」从订阅链接更新节点列表。</li>
-      <li>「外网探测」经 127.0.0.1:10808 SOCKS 走 Xray，请求 generate_204（HTTP 204/200 才算通）。TCP Ping 只测节点端口，不等于能打开 Google。</li>
-      <li>电视上的「测试」与网页「外网探测」是同一条路径。启动成功不会显示「代理正常」。</li>
+      <li>「外网探测」经 127.0.0.1:10808 SOCKS 走 Xray，查询 ipinfo.io 出口 IP 与国家旗帜。ipinfo 失败时才回退 generate_204。</li>
+      <li>电视上的「测试」与网页「外网探测」是同一条路径。首页状态与 Toast 约 5 秒后自动消失。</li>
     </ul>
   </aside>
 

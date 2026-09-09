@@ -20,4 +20,7 @@ data class ProxyProbeResult(
     val url: String? = null,
     val error: String? = null,
     val message: String = "",
+    val exitIp: String? = null,
+    val country: String? = null,
+    val flag: String? = null,
 )

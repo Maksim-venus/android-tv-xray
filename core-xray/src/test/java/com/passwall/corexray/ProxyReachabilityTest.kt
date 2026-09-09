@@ -17,17 +17,34 @@ class ProxyReachabilityTest {
     }
 
     @Test
-    fun successMessageMentionsProxyAndHttp() {
-        val text = ProxyReachability.formatSuccess("https://www.gstatic.com/generate_204", 204, 62)
-        assertTrue(text.contains("外网可达"))
-        assertTrue(text.contains("204"))
+    fun exitMessageUsesFlagAndIp() {
+        val flag = CountryFlag.fromCountryCode("JP")
+        val text = ProxyReachability.formatExit(flag, "1.2.3.4", 62)
+        assertTrue(text.contains(flag))
+        assertTrue(text.contains("出口"))
+        assertTrue(text.contains("1.2.3.4"))
         assertTrue(text.contains("62"))
-        assertTrue(text.contains("经代理"))
         assertFalse(text.contains("代理正常"))
     }
 
     @Test
-    fun defaultUrlsAreGenerate204ThroughWellKnownHosts() {
+    fun fallbackMessageMentionsMissingExit() {
+        val text = ProxyReachability.formatSuccess("https://www.gstatic.com/generate_204", 204, 62)
+        assertTrue(text.contains("外网可达"))
+        assertTrue(text.contains("204"))
+        assertTrue(text.contains("62"))
+        assertTrue(text.contains("无出口信息"))
+        assertFalse(text.contains("代理正常"))
+    }
+
+    @Test
+    fun primaryUrlsAreIpinfo() {
+        assertTrue(ProxyReachability.IPINFO_URLS.any { it.contains("ipinfo.io/json") })
+        assertTrue(ProxyReachability.IPINFO_URLS.all { it.contains("ipinfo.io") })
+    }
+
+    @Test
+    fun defaultUrlsAreGenerate204Fallback() {
         assertTrue(ProxyReachability.DEFAULT_URLS.any { it.contains("gstatic.com/generate_204") })
         assertTrue(ProxyReachability.DEFAULT_URLS.any { it.contains("google.com/generate_204") })
         assertTrue(ProxyReachability.DEFAULT_URLS.all { it.startsWith("https://") })
@@ -35,7 +52,7 @@ class ProxyReachabilityTest {
 
     @Test
     fun emptyUrlListFailsClearly() {
-        val result = ProxyReachability.probe(urls = emptyList())
+        val result = ProxyReachability.probe(ipinfoUrls = emptyList(), fallbackUrls = emptyList())
         assertFalse(result.ok)
         assertTrue(result.message.contains("外网不可达"))
     }

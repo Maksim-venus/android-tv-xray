@@ -18,7 +18,7 @@ v26.1.13 is the last well-verified published AAR that:
 3. `Libv2ray.initCoreEnv(filesDir/xray, "")` so `geoip.dat` / `geosite.dat` resolve.
 4. `CoreController.startLoop(json, tun.fd)` sets process env `xray.tun.fd`. The same fd is also written into the JSON root `env` object. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`.
 5. Routing: `geosite:cn` / `geoip:cn` / `geoip:private` → freedom; else → selected VLESS/VMess outbound.
-6. 「测试」sends HTTPS GET to `generate_204` via the local SOCKS inbound (`127.0.0.1:10808`) so the request goes through Xray routing → the selected outbound. `measureDelay` is optional extra “链路” timing only.
+6. 「测试」sends HTTPS GET to `https://ipinfo.io/json` via the local SOCKS inbound (`127.0.0.1:10808`) so the request goes through Xray routing → the selected outbound. The UI shows the exit IP and a country-flag emoji. `generate_204` is used only if ipinfo fails. `measureDelay` is optional extra “链路” timing only. TV status / Toast clear after 5 seconds.
 7. TLS: when 「允许不安全 SSL」 is on, emit `allowInsecure: true`. Do not emit `verifyPeerCertByName` (this core uses `verifyPeerCertInNames`). Optional `pinnedPeerCertSha256` is accepted if the share link has `pcs`.
 
 ## Fetch the AAR (developers)

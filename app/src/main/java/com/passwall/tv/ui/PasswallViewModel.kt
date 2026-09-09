@@ -107,12 +107,12 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
                 }
                 return@launch
             }
-            ProxyRuntime.markTestProgress("正在经代理探测外网…")
+            ProxyRuntime.markTestProgress("正在查询出口 IP…")
             val http = withContext(Dispatchers.IO) { ProxyReachability.probe() }
             if (http.ok) {
                 app.repository.updateLatency(node.id, http.latencyMs)
                 val delay = withContext(Dispatchers.IO) { app.engine.measureProxyDelay() }
-                val extra = if (delay.ok && delay.latencyMs != null) "，链路 ${delay.latencyMs} ms" else ""
+                val extra = if (delay.ok && delay.latencyMs != null) " · 链路 ${delay.latencyMs} ms" else ""
                 ProxyRuntime.markTest(true, http.message + extra)
             } else {
                 ProxyRuntime.markTest(false, http.message)

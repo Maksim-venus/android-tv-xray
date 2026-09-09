@@ -3,6 +3,7 @@ const state = {
   subs: [],
   status: null,
   logs: [],
+  lastProbe: null,
   view: "nodes",
   modalMode: "import",
   demo: false,
@@ -88,6 +89,7 @@ function render() {
   $("sysGeo").textContent = state.status?.routingAssetsUpdatedAt
     ? new Date(state.status.routingAssetsUpdatedAt).toLocaleString()
     : "尚未更新（使用 APK 内置）";
+  if (state.lastProbe) showLastProbe(state.lastProbe);
   const err = state.status?.lastError;
   const showErr = !running && !!err;
   const errText = showErr ? `启动失败：${err}` : "";
@@ -154,7 +156,7 @@ function renderLogs() {
     </li>`;
   }).join("");
   const meta = $("logMeta");
-  if (meta) meta.textContent = items.length ? `${items.length} 条 · 每 4 秒刷新` : "自动刷新中";
+  if (meta) meta.textContent = items.length ? `${items.length} 条 · 仅保留 7 天 · 每 4 秒刷新` : "仅保留 7 天 · 自动刷新中";
 }
 
 function formatTime(ms) {
@@ -216,9 +218,9 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
       logs: "日志",
     })[state.view] || "节点管理";
     $("pageSub").textContent = state.view === "system"
-      ? "代理启停、allowInsecure（Xray 26.1.13）与 HTTP 编辑。外网探测走 SOCKS。"
+      ? "代理启停、allowInsecure（Xray 26.1.13）与 HTTP 编辑。外网探测走 SOCKS 查 ipinfo.io。"
       : state.view === "logs"
-        ? "VPN / Xray 运行记录，便于手机浏览器排查"
+        ? "VPN / Xray 运行记录，仅保留 7 天；清空会删全部"
         : "集中管理您的代理节点、订阅与网络配置";
     if (state.view === "logs") loadLogs().then(renderLogs);
   });
@@ -297,11 +299,26 @@ $("btnTcpPing").onclick = async () => {
   } catch (e) { toast(state.demo ? "预览模式无法 TCP Ping" : e.message); }
 };
 
+function formatProbe(r) {
+  if (r?.message) return r.message;
+  if (r?.ok && r.exitIp) return `${r.flag || "🌐"} 出口 ${r.exitIp}`;
+  return r?.ok ? "外网可达" : (r?.error || "外网不可达");
+}
+
+function showLastProbe(r) {
+  state.lastProbe = r;
+  const el = $("sysProbe");
+  if (!el || !r) return;
+  el.textContent = formatProbe(r);
+}
+
 async function runOutboundProbe() {
   try {
     const r = await api("/api/proxy/probe", { method: "POST", body: "{}" });
-    toast(r.message || (r.ok ? "外网可达" : "外网不可达"));
+    showLastProbe(r);
+    toast(formatProbe(r));
     await loadAll();
+    showLastProbe(r);
   } catch (e) { toast(state.demo ? "预览模式无法探测外网" : e.message); }
 }
 if ($("btnProbe")) $("btnProbe").onclick = runOutboundProbe;
