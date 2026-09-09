@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Passwall 代理与网络管理工具</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="shield" aria-hidden="true"></div>
+      <div>
+        <div class="brand-name">Passwall</div>
+        <div class="brand-sub">代理与网络管理工具</div>
+      </div>
+    </div>
+    <nav>
+      <button class="nav-item active" data-view="nodes">节点</button>
+      <button class="nav-item" data-view="subs">订阅</button>
+      <button class="nav-item" data-view="system">系统</button>
+    </nav>
+    <div class="sidebar-status">
+      <div class="run-line">
+        <span class="dot" id="runDot"></span>
+        <span>运行状态</span>
+      </div>
+      <div id="runText">Passwall 已停止</div>
+      <div class="ver">v0.1.0</div>
+    </div>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div>
+        <h1 id="pageTitle">节点管理</h1>
+        <p class="sub" id="pageSub">集中管理您的代理节点、订阅与网络配置</p>
+      </div>
+      <div class="top-meta">
+        <span id="lanHint">未连接局域网</span>
+        <button class="icon-btn" id="refreshBtn" title="刷新">↻</button>
+      </div>
+    </header>
+
+    <section id="view-nodes" class="view">
+      <div class="toolbar">
+        <button class="btn primary" id="btnImport">导入链接</button>
+        <button class="btn" id="btnAddSub">添加订阅</button>
+        <button class="btn" id="btnLatency">测试延迟</button>
+        <button class="btn" id="btnTcpPing">TCP Ping</button>
+        <div class="spacer"></div>
+        <input id="search" class="search" placeholder="搜索名称 / 地址" />
+        <select id="protoFilter">
+          <option value="">全部协议</option>
+          <option>VLESS</option>
+          <option>VMess</option>
+          <option>SSR</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <div class="card-title">节点列表</div>
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>协议</th>
+              <th>延迟</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="nodeBody"></tbody>
+        </table>
+        <div id="nodeEmpty" class="empty hidden">暂无节点。请用「导入链接」添加 vless:// 或 vmess://。</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">订阅列表</div>
+        <div id="subList"></div>
+        <div id="subEmpty" class="empty hidden">暂无订阅。添加订阅后可从机场链接批量更新节点。</div>
+      </div>
+    </section>
+
+    <section id="view-subs" class="view hidden">
+      <div class="card">
+        <div class="card-title">订阅管理</div>
+        <p class="hint">拉取实现当前为 Stub（TODO）。解析器已支持 Base64 订阅正文与逐行分享链接。</p>
+        <div id="subList2"></div>
+      </div>
+    </section>
+
+    <section id="view-system" class="view hidden">
+      <div class="card">
+        <div class="card-title">系统</div>
+        <label class="row">
+          <span>允许不安全 SSL</span>
+          <input type="checkbox" id="optInsecure" />
+        </label>
+        <label class="row">
+          <span>开启 HTTP 编辑</span>
+          <input type="checkbox" id="optHttp" />
+        </label>
+        <div class="row">
+          <span>局域网地址</span>
+          <code id="sysUrl">—</code>
+        </div>
+        <div class="row actions">
+          <button class="btn primary" id="btnStart">启动代理</button>
+          <button class="btn" id="btnStop">停止代理</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="tips">
+    <div class="tips-title">小贴士</div>
+    <ul>
+      <li>支持批量导入，每行一条分享链接。</li>
+      <li>导入的节点会归入「手动导入」。</li>
+      <li>请使用「订阅管理」从订阅链接更新节点列表。</li>
+    </ul>
+  </aside>
+
+  <div id="modal" class="modal hidden">
+    <div class="dialog">
+      <h2 id="modalTitle">导入节点链接</h2>
+      <p class="hint" id="modalHint">分享链接（支持 ss://、vmess://、vless://、trojan://、hysteria2:// 等）。每行一个链接，导入后将自动解析并添加到节点列表。</p>
+      <textarea id="modalText" rows="8" placeholder="vless://uuid@host:443?security=tls&amp;type=tcp#东京-1"></textarea>
+      <div class="dialog-actions">
+        <button class="btn" id="modalCancel">取消</button>
+        <button class="btn primary" id="modalOk">导入</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
