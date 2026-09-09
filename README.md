@@ -12,17 +12,17 @@ GitHub 稍后上传到 `https://github.com/Maksim-venus/android-tv-xray`。当�
 
 | 电视 / 盒子 | 选这个文件 |
 | --- | --- |
-| **Android 9 / 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.2.apk`（包名 `com.passwall.tv.legacy`） |
-| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.2.apk`（包名 `com.passwall.tv`） |
+| **Android 9 / 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.3.apk`（包名 `com.passwall.tv.legacy`） |
+| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.3.apk`（包名 `com.passwall.tv`） |
 
 不确定就先装 **legacy**。两个可以同时装（包名不同）。
 
 成品路径（本机构建后，可直接拷走安装）：
 
-- `/workspace/dist/Passwall-TV-legacy-0.1.2.apk`
-- `/workspace/dist/Passwall-TV-modern-0.1.2.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.2.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.2.apk`
+- `/workspace/dist/Passwall-TV-legacy-0.1.3.apk`
+- `/workspace/dist/Passwall-TV-modern-0.1.3.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.3.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.3.apk`
 - 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
 - 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
 
@@ -38,9 +38,9 @@ GitHub 稍后上传到 `https://github.com/Maksim-venus/android-tv-xray`。当�
 
 ```bash
 adb connect 电视IP:5555
-adb install -r dist/Passwall-TV-legacy-0.1.2.apk
+adb install -r dist/Passwall-TV-legacy-0.1.3.apk
 # 或
-adb install -r dist/Passwall-TV-modern-0.1.2.apk
+adb install -r dist/Passwall-TV-modern-0.1.3.apk
 ```
 
 ### 3. 第一次使用
@@ -66,8 +66,8 @@ adb install -r dist/Passwall-TV-modern-0.1.2.apk
 
 | Device | APK |
 | --- | --- |
-| Android 9 / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.2.apk` |
-| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.2.apk` |
+| Android 9 / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.3.apk` |
+| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.3.apk` |
 
 Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an empty node list. Enable HTTP edit on the TV, import `vless://` / `vmess://` from a phone on the same LAN, select the node, press 启动, accept the VPN dialog. **测试** measures delay through the live Xray core.
 
@@ -78,7 +78,7 @@ Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an
 - Real **Xray-core** via [AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite) `libv2ray.aar` **v26.9.9** (LGPL-3.0). Native `libgojni.so` for `armeabi-v7a` + `arm64-v8a`.
 - VpnService TUN fd is passed to `CoreController.startLoop(config, tunFd)` (`xray.tun.fd`). Config uses a **tun** inbound (gVisor) — not a drain stub.
 - ChinaDNS-style split: `geosite:cn` / `geoip:cn` / private → direct; else → VLESS/VMess. `allowInsecure` is honored.
-- Bundled geo assets + 7-day Loyalsoldier refresh after a successful start (failure never blocks VPN).
+- Bundled **official Loyalsoldier** `geosite.dat` (must contain `cn`; compact generate-geosite.py is banned) plus `geoip-only-cn-private`. Invalid runtime files are replaced. If Xray still rejects geosite, start retries with IP-only `geoip:cn` rules. 7-day refresh after a successful start.
 - Local Passwall-like web admin when HTTP edit is on. Sidebar **日志** shows VPN/Xray ring-buffer lines (`GET /api/logs`), auto-refresh, error filter, clear. Latest start failure is shown on the admin status panel.
 - Licenses: [THIRD_PARTY.md](THIRD_PARTY.md). Native notes: [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md).
 
@@ -91,6 +91,7 @@ Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an
 
 ```bash
 ./scripts/fetch-libv2ray.sh   # also runs automatically on assemble
+./scripts/fetch-geo-assets.sh # official geosite.dat; also on assemble
 ./gradlew assembleLegacyRelease assembleModernRelease
 ./scripts/package-release-apks.sh
 ```

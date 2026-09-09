@@ -32,7 +32,7 @@ object RoutingAssetCatalog {
         ),
         RemoteAsset(
             fileName = GEOSITE,
-            minBytes = 1_000,
+            minBytes = 100_000,
             urls = listOf(
                 "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat",
                 "https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat",

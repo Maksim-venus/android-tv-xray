@@ -15,6 +15,8 @@ data class GeneratedConfig(
     val socksPort: Int = DEFAULT_SOCKS_PORT,
     val inboundTag: String = "socks-in",
     val notes: List<String> = emptyList(),
+    val usedGeosite: Boolean = true,
+    val usedGeoip: Boolean = true,
 )
 
 object XrayPorts {
@@ -35,17 +37,25 @@ object XrayConfigGenerator {
         settings: AppSettings,
         socksPort: Int = DEFAULT_SOCKS_PORT,
         enableIpv6: Boolean = false,
+        health: GeodataHealth = GeodataHealth(geositeOk = true, geoipOk = true),
+        extraDirectIps: List<String> = emptyList(),
     ): GeneratedConfig {
         val notes = mutableListOf<String>()
         if (node.protocol == Protocol.SSR) {
             notes += "TODO(ssr): SSR outbound is not mapped. Config uses a placeholder vless outbound."
+        }
+        if (!health.geositeOk) {
+            notes += "geosite.dat 无效（${health.geositeError}），已改为 IP 分流，不用 geosite:cn。"
+        }
+        if (!health.geoipOk) {
+            notes += "geoip.dat 无效（${health.geoipError}），直连改用 cn-cidr 列表。"
         }
         val allowInsecure = settings.allowInsecureSsl || node.allowInsecure
         val root = buildJsonObject {
             put("log", buildJsonObject {
                 put("loglevel", JsonPrimitive("warning"))
             })
-            put("dns", chinaDns(enableIpv6))
+            put("dns", chinaDns(enableIpv6, health.geositeOk, health.geoipOk))
             put("inbounds", buildJsonArray {
                 add(tunInbound())
                 add(socksInbound(socksPort))
@@ -69,12 +79,14 @@ object XrayConfigGenerator {
                     })
                 })
             })
-            put("routing", chinaRouting())
+            put("routing", chinaRouting(health, extraDirectIps))
         }
         return GeneratedConfig(
             json = pretty.encodeToString(JsonObject.serializer(), root),
             socksPort = socksPort,
             notes = notes,
+            usedGeosite = health.geositeOk,
+            usedGeoip = health.geoipOk,
         )
     }
 
@@ -89,37 +101,56 @@ object XrayConfigGenerator {
         return JsonObject(root + ("env" to env)).toString()
     }
 
-    private fun chinaDns(enableIpv6: Boolean): JsonObject = buildJsonObject {
+    private fun chinaDns(enableIpv6: Boolean, geositeOk: Boolean, geoipOk: Boolean): JsonObject = buildJsonObject {
         put("queryStrategy", JsonPrimitive(if (enableIpv6) "UseIP" else "UseIPv4"))
         put("servers", buildJsonArray {
-            add(buildJsonObject {
-                put("address", JsonPrimitive("223.5.5.5"))
-                put("domains", jsonStrings("geosite:cn"))
-                put("expectIPs", jsonStrings("geoip:cn"))
-            })
-            add(buildJsonObject {
-                put("address", JsonPrimitive("119.29.29.29"))
-                put("domains", jsonStrings("geosite:cn"))
-            })
-            add(buildJsonObject {
-                put("address", JsonPrimitive("8.8.8.8"))
-                put("domains", jsonStrings("geosite:geolocation-!cn"))
-            })
-            add(buildJsonObject {
-                put("address", JsonPrimitive("1.1.1.1"))
-                put("domains", jsonStrings("geosite:geolocation-!cn"))
-            })
+            if (geositeOk) {
+                add(buildJsonObject {
+                    put("address", JsonPrimitive("223.5.5.5"))
+                    put("domains", jsonStrings("geosite:cn"))
+                    if (geoipOk) put("expectIPs", jsonStrings("geoip:cn"))
+                })
+                add(buildJsonObject {
+                    put("address", JsonPrimitive("119.29.29.29"))
+                    put("domains", jsonStrings("geosite:cn"))
+                })
+                add(buildJsonObject {
+                    put("address", JsonPrimitive("8.8.8.8"))
+                    put("domains", jsonStrings("geosite:geolocation-!cn"))
+                })
+                add(buildJsonObject {
+                    put("address", JsonPrimitive("1.1.1.1"))
+                    put("domains", jsonStrings("geosite:geolocation-!cn"))
+                })
+            } else {
+                add(JsonPrimitive("223.5.5.5"))
+                add(JsonPrimitive("8.8.8.8"))
+            }
             add(JsonPrimitive("localhost"))
         })
     }
 
-    private fun chinaRouting(): JsonObject = buildJsonObject {
+    private fun chinaRouting(health: GeodataHealth, extraDirectIps: List<String>): JsonObject = buildJsonObject {
         put("domainStrategy", JsonPrimitive("IPIfNonMatch"))
         put("rules", buildJsonArray {
-            add(rule(outbound = "direct", ip = listOf("geoip:private")))
-            add(rule(outbound = "direct", domain = listOf("geosite:cn")))
-            add(rule(outbound = "direct", ip = listOf("geoip:cn")))
-            add(rule(outbound = "block", domain = listOf("geosite:category-ads-all")))
+            if (health.geoipOk) {
+                add(rule(outbound = "direct", ip = listOf("geoip:private")))
+            } else {
+                add(rule(outbound = "direct", ip = listOf("geoip:private", "127.0.0.0/8", "10.0.0.0/8", "192.168.0.0/16")))
+            }
+            if (health.geositeOk) {
+                add(rule(outbound = "direct", domain = listOf("geosite:cn")))
+            }
+            if (health.geoipOk) {
+                add(rule(outbound = "direct", ip = listOf("geoip:cn")))
+            } else if (extraDirectIps.isNotEmpty()) {
+                extraDirectIps.chunked(500).forEach { chunk ->
+                    add(rule(outbound = "direct", ip = chunk))
+                }
+            }
+            if (health.geositeOk) {
+                add(rule(outbound = "block", domain = listOf("geosite:category-ads-all")))
+            }
             add(rule(outbound = "proxy", network = "tcp,udp"))
         })
     }

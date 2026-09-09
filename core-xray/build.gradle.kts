@@ -13,8 +13,18 @@ val fetchLibv2ray = tasks.register<Exec>("fetchLibv2ray") {
     onlyIf { !libv2rayAar.exists() || libv2rayAar.length() < 1_000_000 }
 }
 
+val geositeDat = file("src/main/assets/xray/geosite.dat")
+val fetchGeoAssets = tasks.register<Exec>("fetchGeoAssets") {
+    description = "Download official Loyalsoldier geosite.dat if missing or too small"
+    workingDir = rootProject.projectDir
+    commandLine("bash", "scripts/fetch-geo-assets.sh")
+    outputs.file(geositeDat)
+    onlyIf { !geositeDat.exists() || geositeDat.length() < 100_000 }
+}
+
 tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn(fetchLibv2ray)
+    dependsOn(fetchGeoAssets)
 }
 
 android {

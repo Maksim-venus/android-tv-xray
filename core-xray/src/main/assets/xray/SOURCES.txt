@@ -1,43 +1,33 @@
 Passwall TV — bundled routing assets
 ====================================
 
-APK defaults (copied to filesDir/xray/ on first run; never overwritten if a
-last-good download already exists):
+APK defaults (copied to filesDir/xray/ on first run). Invalid / truncated
+files are replaced — we no longer keep a broken “last-good” geosite.dat.
 
   geoip.dat
     Source: Loyalsoldier/geoip  geoip-only-cn-private.dat
     Tags:   cn, private
-    Why:    ~134KB instead of the full world database. Enough for
-            geoip:cn / geoip:private → direct.
+    Size:   ~134KB. Enough for geoip:cn / geoip:private → direct.
 
   geosite.dat
-    Source: scripts/generate-geosite.py (compact cn / geolocation-!cn /
-            category-ads-all). Regenerated at build time if you run the script.
+    Source: Loyalsoldier/v2ray-rules-dat  official geosite.dat
+    Must contain `cn` (and geolocation-!cn, category-ads-all).
+    Fetched by scripts/fetch-geo-assets.sh and checked by
+    scripts/validate-geodata.py. Do NOT use generate-geosite.py.
 
   direct-list.txt
     Source: Loyalsoldier/v2ray-rules-dat  direct-list.txt
-    ChinaDNS-style domain list (cn → direct).
 
   cn-cidr.txt
     Source: 17mon/china_ip_list
-    ChinaDNS-style IPv4 CIDR list.
+    Used only if geoip.dat is unusable.
 
-7-day remote refresh (after a successful proxy start; never blocks VPN):
+If geosite.dat still fails Xray load at runtime, the VPN start path
+retries with IP-only rules (geoip:cn / cn-cidr) and writes a Chinese
+error to the in-app log.
 
-  geoip.dat
-    1. https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat
-    2. https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat
-    3. https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+7-day remote refresh (after a successful proxy start):
 
-  geosite.dat
-    1. https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat
-    2. https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat
-    3. https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-
-  direct-list.txt
-    1. https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/direct-list.txt
-    2. https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/direct-list.txt
-    3. https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/direct-list.txt
-
-jsDelivr / Fastly are tried first (mainland-friendly). GitHub is the last fallback.
-On failure the last-good files stay in place and the Room timestamp is not advanced.
+  geoip.dat / geosite.dat / direct-list.txt
+    jsDelivr → Fastly → GitHub (Loyalsoldier/v2ray-rules-dat).
+    geosite downloads smaller than 100KB are rejected.

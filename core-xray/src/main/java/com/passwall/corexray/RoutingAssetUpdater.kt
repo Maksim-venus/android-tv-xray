@@ -35,7 +35,13 @@ class RoutingAssetUpdater(
         for (asset in RoutingAssetCatalog.remoteFiles) {
             val dest = store.file(asset.fileName)
             val result = downloader.download(asset, dest)
-            result.onSuccess { updated += asset.fileName }
+            result.onSuccess {
+                if (!acceptDownloaded(asset.fileName, dest)) {
+                    errors += "${asset.fileName}: 下载后校验失败（缺少 cn 或文件损坏）"
+                } else {
+                    updated += asset.fileName
+                }
+            }
             result.onFailure { errors += "${asset.fileName}: ${it.message ?: it.javaClass.simpleName}" }
         }
         return if (errors.isEmpty()) {
@@ -53,6 +59,41 @@ class RoutingAssetUpdater(
                 error = errors.joinToString("; "),
             )
         }
+    }
+
+    /**
+     * Blocking repair used before VPN start when bundled/runtime geodata is invalid.
+     */
+    fun repairInvalid(health: GeodataHealth): GeodataHealth {
+        val needed = buildList {
+            if (!health.geositeOk) add(RoutingAssetCatalog.GEOSITE)
+            if (!health.geoipOk) add(RoutingAssetCatalog.GEOIP)
+        }
+        for (name in needed) {
+            val asset = RoutingAssetCatalog.remoteFiles.firstOrNull { it.fileName == name } ?: continue
+            val dest = store.file(name)
+            RuntimeLog.warn("正在下载可用的 $name…", "geo")
+            val result = downloader.download(asset, dest)
+            result.onSuccess {
+                if (!acceptDownloaded(name, dest)) {
+                    RuntimeLog.warn("$name 下载后仍无法识别 cn 列表", "geo")
+                } else {
+                    RuntimeLog.info("已下载可用的 $name", "geo")
+                }
+            }
+            result.onFailure {
+                RuntimeLog.warn("$name 下载失败：${it.message}", "geo")
+            }
+        }
+        return store.health()
+    }
+
+    private fun acceptDownloaded(fileName: String, dest: java.io.File): Boolean = when (fileName) {
+        RoutingAssetCatalog.GEOSITE ->
+            GeodataValidator.hasCode(dest, "cn", GeodataValidator.MIN_GEOSITE_BYTES)
+        RoutingAssetCatalog.GEOIP ->
+            GeodataValidator.hasCode(dest, "cn", GeodataValidator.MIN_GEOIP_BYTES)
+        else -> dest.length() > 0
     }
 
     companion object {

@@ -9,6 +9,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
+import com.passwall.corexray.GeodataHealth
 import com.passwall.corexray.XrayConfigGenerator
 import com.passwall.data.log.RuntimeLog
 import com.passwall.tv.BuildConfig
@@ -41,10 +42,21 @@ class ProxyVpnService : VpnService() {
         }
         val settings = app.repository.getSettings()
         app.routingAssets.installBundledDefaults()
-        val generated = XrayConfigGenerator.generate(
+        var health = app.routingAssets.health()
+        if (!health.geositeOk || !health.geoipOk) {
+            RuntimeLog.warn(
+                "分流数据不可用：geosite=${health.geositeError ?: "ok"} geoip=${health.geoipError ?: "ok"}",
+                "geo",
+            )
+            health = runCatching { app.assetUpdater.repairInvalid(health) }.getOrDefault(health)
+        }
+        val extraIps = if (!health.geoipOk) app.routingAssets.extraDirectIps() else emptyList()
+        var generated = XrayConfigGenerator.generate(
             node = node,
             settings = settings,
             enableIpv6 = BuildConfig.ENABLE_IPV6,
+            health = health,
+            extraDirectIps = extraIps,
         )
         val configFile = app.routingAssets.configFile()
         try {
@@ -71,7 +83,33 @@ class ProxyVpnService : VpnService() {
                 return
             }
             generated.notes.forEach { RuntimeLog.warn("配置：$it", "xray") }
-            app.engine.start(generated, configFile, tun)
+            try {
+                app.engine.start(generated, configFile, tun)
+            } catch (t: Throwable) {
+                if (isGeodataFailure(t) && generated.usedGeosite) {
+                    RuntimeLog.warn(
+                        "Xray 拒绝 geosite.dat（${t.message}），改用 geoip/IP 分流重试",
+                        "xray",
+                    )
+                    val fallbackHealth = GeodataHealth(
+                        geositeOk = false,
+                        geoipOk = health.geoipOk,
+                        geositeError = t.message,
+                        geoipError = health.geoipError,
+                    )
+                    generated = XrayConfigGenerator.generate(
+                        node = node,
+                        settings = settings,
+                        enableIpv6 = BuildConfig.ENABLE_IPV6,
+                        health = fallbackHealth,
+                        extraDirectIps = extraIps,
+                    )
+                    generated.notes.forEach { RuntimeLog.warn("配置：$it", "xray") }
+                    app.engine.start(generated, configFile, tun)
+                } else {
+                    throw t
+                }
+            }
             ProxyRuntime.markStarted(getString(R.string.proxy_ok))
             // Never block start: refresh geoip/geosite in the background.
             scope.launch {
@@ -135,5 +173,13 @@ class ProxyVpnService : VpnService() {
     companion object {
         private const val CHANNEL_ID = "passwall_vpn"
         private const val NOTIFICATION_ID = 41
+
+        internal fun isGeodataFailure(t: Throwable): Boolean {
+            val msg = (t.message ?: "") + (t.cause?.message ?: "")
+            return msg.contains("geosite", ignoreCase = true) ||
+                msg.contains("geoip", ignoreCase = true) ||
+                msg.contains("geodata", ignoreCase = true) ||
+                (msg.contains("EOF") && msg.contains("cn", ignoreCase = true))
+        }
     }
 }
