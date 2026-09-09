@@ -73,6 +73,9 @@ function render() {
   $("optInsecure").checked = !!state.status?.allowInsecureSsl;
   $("optHttp").checked = !!state.status?.httpEditEnabled;
   $("sysUrl").textContent = state.status?.lanUrl || "—";
+  $("sysGeo").textContent = state.status?.routingAssetsUpdatedAt
+    ? new Date(state.status.routingAssetsUpdatedAt).toLocaleString()
+    : "尚未更新（使用 APK 内置）";
 
   const q = ($("search").value || "").toLowerCase();
   const proto = $("protoFilter").value;

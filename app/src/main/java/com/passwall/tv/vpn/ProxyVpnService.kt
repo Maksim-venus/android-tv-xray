@@ -19,7 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.io.File
 
 class ProxyVpnService : VpnService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -40,12 +39,13 @@ class ProxyVpnService : VpnService() {
             return
         }
         val settings = app.repository.getSettings()
+        app.routingAssets.installBundledDefaults()
         val generated = XrayConfigGenerator.generate(
             node = node,
             settings = settings,
             enableIpv6 = BuildConfig.ENABLE_IPV6,
         )
-        val configFile = File(filesDir, "xray-config.json")
+        val configFile = app.routingAssets.configFile()
         try {
             val builder = Builder()
                 .setSession("Passwall")
@@ -64,6 +64,10 @@ class ProxyVpnService : VpnService() {
             tun = builder.establish()
             app.engine.start(generated, configFile, tun)
             ProxyRuntime.markStarted(getString(R.string.proxy_ok))
+            // Never block start: refresh geoip/geosite in the background.
+            scope.launch {
+                runCatching { app.assetUpdater.refreshAfterSuccessfulStart() }
+            }
         } catch (t: Throwable) {
             ProxyRuntime.markError(t.message ?: t.javaClass.simpleName)
             stopSelf()

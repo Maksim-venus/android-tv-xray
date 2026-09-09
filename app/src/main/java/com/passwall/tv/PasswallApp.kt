@@ -4,6 +4,8 @@ import android.app.Application
 import com.passwall.adminweb.AdminRuntime
 import com.passwall.adminweb.AdminServer
 import com.passwall.corexray.NativeXrayEngine
+import com.passwall.corexray.RoutingAssetStore
+import com.passwall.corexray.RoutingAssetUpdater
 import com.passwall.corexray.XrayEngine
 import com.passwall.data.db.AppDatabase
 import com.passwall.data.repo.PasswallRepository
@@ -22,12 +24,19 @@ class PasswallApp : Application() {
         private set
     lateinit var adminServer: AdminServer
         private set
+    lateinit var routingAssets: RoutingAssetStore
+        private set
+    lateinit var assetUpdater: RoutingAssetUpdater
+        private set
 
     override fun onCreate() {
         super.onCreate()
         instance = this
         val db = AppDatabase.create(this)
         repository = PasswallRepository(db)
+        routingAssets = RoutingAssetStore(this)
+        routingAssets.installBundledDefaults()
+        assetUpdater = RoutingAssetUpdater(routingAssets, repository)
         engine = NativeXrayEngine()
         adminServer = AdminServer(
             context = this,

@@ -118,11 +118,15 @@ data class SettingsEntity(
     val allowInsecureSsl: Boolean = false,
     val httpEditEnabled: Boolean = false,
     val httpPort: Int = AppSettings.DEFAULT_HTTP_PORT,
+    val routingAssetsUpdatedAt: Long? = null,
+    val routingAssetsAttemptedAt: Long? = null,
 ) {
     fun toModel(): AppSettings = AppSettings(
         selectedNodeId = selectedNodeId,
         allowInsecureSsl = allowInsecureSsl,
         httpEditEnabled = httpEditEnabled,
         httpPort = httpPort,
+        routingAssetsUpdatedAt = routingAssetsUpdatedAt,
+        routingAssetsAttemptedAt = routingAssetsAttemptedAt,
     )
 }

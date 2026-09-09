@@ -34,7 +34,7 @@ The APK ships a **VpnService shell** and a **Kotlin stub engine**. Packets from 
 
 5. Hand the TUN `ParcelFileDescriptor` to tun2socks / gVisor as required by that AAR. The drain thread in `StubXrayEngine` is the placeholder.
 
-6. Place `geoip.dat` and `geosite.dat` where the core can read them (AAR assets or `filesDir`). Split routing in `XrayConfigGenerator` already references `geosite:cn` and `geoip:cn`.
+6. Point the core at `filesDir/xray/` (same folder as `xray-config.json`). The APK already installs `geoip.dat` / `geosite.dat` there and refreshes them from Loyalsoldier after a successful start if the Room timestamp is older than 7 days. Call `InitCoreEnv` with that directory. Split routing in `XrayConfigGenerator` already references `geosite:cn` and `geoip:cn`.
 
 ## Optional C stub
 

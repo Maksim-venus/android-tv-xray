@@ -89,6 +89,7 @@ class AdminServer(
                                 httpEditEnabled = settings.httpEditEnabled,
                                 lanUrl = LanAddress.httpUrl(settings.httpPort),
                                 message = runtime.statusMessage(),
+                                routingAssetsUpdatedAt = settings.routingAssetsUpdatedAt,
                             ),
                         )
                     }

@@ -13,6 +13,7 @@ data class StatusDto(
     val lanUrl: String,
     val version: String = "0.1.0",
     val message: String = "",
+    val routingAssetsUpdatedAt: Long? = null,
 )
 
 @Serializable

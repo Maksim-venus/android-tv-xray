@@ -61,6 +61,16 @@ class PasswallRepository(
         settings.upsert(current.copy(httpEditEnabled = enabled))
     }
 
+    suspend fun setRoutingAssetsUpdatedAt(epochMs: Long) {
+        val current = settings.get() ?: SettingsEntity()
+        settings.upsert(current.copy(routingAssetsUpdatedAt = epochMs, routingAssetsAttemptedAt = epochMs))
+    }
+
+    suspend fun setRoutingAssetsAttemptedAt(epochMs: Long) {
+        val current = settings.get() ?: SettingsEntity()
+        settings.upsert(current.copy(routingAssetsAttemptedAt = epochMs))
+    }
+
     suspend fun importLinks(text: String): ParseResult {
         val result = ShareLinkParser.parseBatch(text, NodeSource.MANUAL)
         if (result.nodes.isNotEmpty()) {

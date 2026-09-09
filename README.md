@@ -23,7 +23,7 @@ GitHub upload is **later** (`https://github.com/Maksim-venus/android-tv-xray`). 
 | --- | --- |
 | `app` | TV Compose UI, `VpnService` + foreground notification, API 28+ permissions |
 | `data` | Room, `vless://` / `vmess://` parsers, SSR recognition stub, subscription **fetch** stub |
-| `core-xray` | start / stop / status, Xray JSON (ChinaDNS split + `allowInsecure`), JNI TODO |
+| `core-xray` | start / stop / status, Xray JSON (ChinaDNS split + `allowInsecure`), bundled geoip/geosite, 7-day refresh, JNI TODO |
 | `admin-web` | Ktor CIO on LAN, static admin, REST, TCP ping. Runs only when HTTP edit is on |
 
 ### Dual APK
@@ -67,6 +67,35 @@ See [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md). Until then:
 - Config is real (VLESS/VMess outbound, geosite:cn / geoip:cn / private → `freedom`).
 - Engine is `StubXrayEngine`: writes JSON, reports RUNNING, drains TUN. **No packet forwarding.**
 - SSR: link is recognized; outbound is a TODO placeholder.
+
+### Routing assets (geoip / geosite / ChinaDNS)
+
+Defaults are **bundled in the APK** under `core-xray/src/main/assets/xray/` and copied to `filesDir/xray/` (next to `xray-config.json`) on first run. Last-good downloaded files are never overwritten by the APK copy.
+
+| File | Bundled default | Purpose |
+| --- | --- | --- |
+| `geoip.dat` | Loyalsoldier `geoip-only-cn-private.dat` (~134KB) | `geoip:cn`, `geoip:private` |
+| `geosite.dat` | Compact list from `scripts/generate-geosite.py` | `geosite:cn`, `geosite:geolocation-!cn`, `geosite:category-ads-all` |
+| `direct-list.txt` | Loyalsoldier ChinaDNS-style domain list | cn → direct domains |
+| `cn-cidr.txt` | [17mon/china_ip_list](https://github.com/17mon/china_ip_list) | ChinaDNS-style IPv4 CIDRs |
+
+**Update behavior:** after **every successful proxy start**, the app checks `app_settings.routingAssetsUpdatedAt` in Room. If it is missing or older than **7 days**, it downloads the full Loyalsoldier files **once** (jsDelivr → Fastly → GitHub). Failure keeps the bundled/last-good files and does **not** block VPN start. A failed attempt is retried at most every 6 hours. The new timestamp is written only after all remote files succeed.
+
+Remote URLs (see also `core-xray/src/main/assets/xray/SOURCES.txt`):
+
+```
+https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat
+https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat
+https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/direct-list.txt
+https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/<same>
+https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/<same>
+```
+
+Regenerate the compact geosite default:
+
+```bash
+python3 scripts/generate-geosite.py
+```
 
 ### Web admin
 
@@ -159,5 +188,9 @@ GitHub 仓库（`Maksim-venus/android-tv-xray`）**稍后上传**。当前以本
 
 - `app`：电视 UI、VpnService、前台通知
 - `data`：Room、分享链接解析、订阅拉取 Stub
-- `core-xray`：启停与状态、分流 JSON、JNI 预留
+- `core-xray`：启停与状态、分流 JSON、内置 geoip/geosite、7 天自动更新、JNI 预留
+
+### 分流规则资源
+
+APK 内置 `geoip.dat`（Loyalsoldier 仅 CN+内网）、精简 `geosite.dat`、`direct-list.txt`、`cn-cidr.txt`，首次运行复制到 `filesDir/xray/`。每次**代理启动成功后**检查 Room 字段 `routingAssetsUpdatedAt`：超过 **7 天**（或从未成功更新）则后台下载 Loyalsoldier 全量 geoip/geosite/direct-list（jsDelivr → Fastly → GitHub）。失败则继续用内置/上次成功文件，**不阻止 VPN 启动**。时间戳仅在全部下载成功后写入。地址见 `core-xray/src/main/assets/xray/SOURCES.txt`。
 - `admin-web`：Ktor + 静态管理页 + REST + TCP Ping（仅 HTTP 编辑开启时）
