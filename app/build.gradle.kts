@@ -88,7 +88,7 @@ dependencies {
     implementation(project(":core-xray"))
     implementation(project(":admin-web"))
     // Packages libv2ray classes + libgojni.so (armeabi-v7a / arm64-v8a).
-    implementation(files("${project(":core-xray").projectDir}/libs/libv2ray.aar"))
+    implementation(files(rootProject.file("core-xray/libs/libv2ray.aar")))
 
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)

@@ -78,6 +78,17 @@ object XrayConfigGenerator {
         )
     }
 
+    /** Stamp VpnService TUN fd into the Xray JSON `env` object (also set by startLoop). */
+    fun injectTunFd(json: String, fd: Int): String {
+        val parsed = Json.parseToJsonElement(json)
+        val root = parsed as? JsonObject ?: return json
+        val env = buildJsonObject {
+            (root["env"] as? JsonObject)?.forEach { (k, v) -> put(k, v) }
+            put("xray.tun.fd", JsonPrimitive(fd.toString()))
+        }
+        return JsonObject(root + ("env" to env)).toString()
+    }
+
     private fun chinaDns(enableIpv6: Boolean): JsonObject = buildJsonObject {
         put("queryStrategy", JsonPrimitive(if (enableIpv6) "UseIP" else "UseIPv4"))
         put("servers", buildJsonArray {
@@ -128,6 +139,7 @@ object XrayConfigGenerator {
 
     private fun tunInbound(): JsonObject = buildJsonObject {
         put("tag", JsonPrimitive("tun-in"))
+        put("port", JsonPrimitive(0))
         put("protocol", JsonPrimitive("tun"))
         put("settings", buildJsonObject {
             put("name", JsonPrimitive("passwall0"))

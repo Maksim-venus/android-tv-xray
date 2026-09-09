@@ -7,7 +7,7 @@ Both APK flavors embed **AndroidLibXrayLite v26.9.9** (`libv2ray.aar`).
 1. `VpnService` creates a TUN (`10.0.85.2/32`, default route, DNS 8.8.8.8 + 223.5.5.5).
 2. The app package is `addDisallowedApplication` so Xray’s own sockets do not loop into the TUN.
 3. `Libv2ray.initCoreEnv(filesDir/xray, "")` so `geoip.dat` / `geosite.dat` resolve.
-4. `CoreController.startLoop(json, tun.fd)` sets `xray.tun.fd`. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`.
+4. `CoreController.startLoop(json, tun.fd)` sets process env `xray.tun.fd`. The same fd is also written into the JSON root `env` object. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`.
 5. Routing: `geosite:cn` / `geoip:cn` / `geoip:private` → freedom; else → selected VLESS/VMess outbound.
 6. 「测试」calls `CoreController.measureDelay` through the running core.
 

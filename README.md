@@ -17,10 +17,12 @@ GitHub 稍后上传到 `https://github.com/Maksim-venus/android-tv-xray`。当�
 
 不确定就先装 **legacy**。两个可以同时装（包名不同）。
 
-成品路径（本机构建后）：
+成品路径（本机构建后，可直接拷走安装）：
 
-- `dist/Passwall-TV-legacy-0.1.0.apk`
-- `dist/Passwall-TV-modern-0.1.0.apk`
+- `/workspace/dist/Passwall-TV-legacy-0.1.0.apk`
+- `/workspace/dist/Passwall-TV-modern-0.1.0.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.0.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.0.apk`
 - 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
 - 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
 

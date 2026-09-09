@@ -80,14 +80,17 @@ class Libv2rayEngine : XrayEngine {
             throw IllegalStateException("VpnService TUN 未建立，无法启动 Xray")
         }
         configFile.parentFile?.mkdirs()
-        configFile.writeText(config.json)
+        // startLoop() sets the process env; also stamp the fd into JSON `env`
+        // so Xray-core can attach the VpnService descriptor if either path is used.
+        val json = XrayConfigGenerator.injectTunFd(config.json, tun.fd)
+        configFile.writeText(json)
         val assetDir = configFile.parentFile?.absolutePath
             ?: throw IllegalStateException("缺少 Xray 资源目录")
         Libv2ray.initCoreEnv(assetDir, "")
         val core = Libv2ray.newCoreController(callback)
         controller = core
         try {
-            core.startLoop(config.json, tun.fd)
+            core.startLoop(json, tun.fd)
         } catch (t: Throwable) {
             controller = null
             running.set(false)
@@ -147,7 +150,6 @@ class Libv2rayEngine : XrayEngine {
 
     companion object {
         private const val TAG = "passwall-xray"
-
         fun versionOrUnknown(): String =
             runCatching { Libv2ray.checkVersionX() }.getOrDefault("libv2ray")
     }

@@ -28,5 +28,14 @@ class XrayConfigGeneratorTest {
         assertTrue(json.contains("outboundTag"))
         assertTrue(json.contains("\"protocol\": \"tun\""))
         assertTrue(json.contains("tun-in"))
+        assertTrue(json.contains("\"port\": 0"))
+    }
+
+    @Test
+    fun injectsTunFdIntoConfigEnv() {
+        val raw = """{"inbounds":[{"protocol":"tun"}]}"""
+        val stamped = XrayConfigGenerator.injectTunFd(raw, 77)
+        assertTrue(stamped.contains("\"xray.tun.fd\""))
+        assertTrue(stamped.contains("77"))
     }
 }
