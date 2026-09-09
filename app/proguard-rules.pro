@@ -1,4 +1,8 @@
 -keep class com.passwall.** { *; }
+-keep class libv2ray.** { *; }
+-keep class go.** { *; }
 -dontwarn org.slf4j.**
 -dontwarn io.ktor.**
 -dontwarn kotlinx.serialization.**
+-dontwarn libv2ray.**
+-dontwarn go.**

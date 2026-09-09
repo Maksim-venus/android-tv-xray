@@ -95,12 +95,22 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
                 ProxyRuntime.markTest(false, "未选择节点")
                 return@launch
             }
+            if (app.engine.isRunning()) {
+                val throughProxy = app.engine.measureProxyDelay()
+                if (throughProxy.ok) {
+                    app.repository.updateLatency(node.id, throughProxy.latencyMs)
+                    ProxyRuntime.markTest(true, "代理正常 ${throughProxy.latencyMs} ms")
+                    return@launch
+                }
+                ProxyRuntime.markTest(false, throughProxy.error ?: "代理异常")
+                return@launch
+            }
             val result = TcpPinger.ping(node)
             if (result.ok) {
                 app.repository.updateLatency(node.id, result.latencyMs)
-                ProxyRuntime.markTest(true, "代理正常")
+                ProxyRuntime.markTest(false, "节点可达，请先启动代理")
             } else {
-                ProxyRuntime.markTest(false, result.error ?: "代理异常")
+                ProxyRuntime.markTest(false, result.error ?: "节点不可达")
             }
         }
     }

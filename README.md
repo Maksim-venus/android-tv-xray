@@ -1,196 +1,123 @@
-# Passwall TV — Android TV Xray 客户端 / Android TV Xray client
+# Passwall TV — Android 电视 Xray 客户端
 
-Minimal Android TV proxy client for mainland China. Dual APK (legacy + modern), Chinese TV UI, local Ktor web admin, VpnService + generated ChinaDNS-style Xray JSON.
+打包即可安装使用。内置 **Xray-core**（AndroidLibXrayLite v26.9.9）：点「启动」后设备流量走 TUN → Xray，国内直连、国外走代理。
 
-GitHub upload is **later** (`https://github.com/Maksim-venus/android-tv-xray`). This Origin repo is the source of truth until that sync.
+GitHub 稍后上传到 `https://github.com/Maksim-venus/android-tv-xray`。当前以本仓库为准。
 
 ---
 
-## English
+## 傻瓜式安装（不会写代码也能用）
 
-### What you get
+### 1. 选哪个 APK？
 
-- **Home STOPPED:** large 启动 + top-right 设置. No sidebar.
-- **Home RUNNING:** large 停止 + 设置 + 测试 + 代理正常.
-- **Settings:** read-only node list (VLESS / VMess badges), select node, 允许不安全 SSL, 开启 HTTP 编辑 → LAN URL + QR. No on-TV text editors.
-- **Web admin (Passwall-like):** 导入链接 / 订阅 / 测延迟 / TCP Ping. Chinese dark UI.
-- **VpnService** starts/stops a TUN interface and writes split-routing config (`cn` → direct, else proxy).
-- **Xray native is stubbed.** Drop in `libv2ray.aar` when ready — see [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md).
+| 电视 / 盒子 | 选这个文件 |
+| --- | --- |
+| **Android 9 / 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.0.apk`（包名 `com.passwall.tv.legacy`） |
+| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.0.apk`（包名 `com.passwall.tv`） |
+
+不确定就先装 **legacy**。两个可以同时装（包名不同）。
+
+成品路径（本机构建后）：
+
+- `dist/Passwall-TV-legacy-0.1.0.apk`
+- `dist/Passwall-TV-modern-0.1.0.apk`
+- 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
+- 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
+
+### 2. 怎么装到电视上
+
+**U 盘 / 文件管理器**
+
+1. 把对应 APK 拷到 U 盘，插到电视。
+2. 用电视自带「文件管理」打开 APK，允许「未知来源 / 安装未知应用」。
+3. 安装完成后，在应用列表找到 **Passwall**。
+
+**电脑 adb（同一局域网）**
+
+```bash
+adb connect 电视IP:5555
+adb install -r dist/Passwall-TV-legacy-0.1.0.apk
+# 或
+adb install -r dist/Passwall-TV-modern-0.1.0.apk
+```
+
+### 3. 第一次使用
+
+电视上**没有键盘输入节点**。用手机浏览器导入：
+
+1. 遥控器打开 Passwall → 右上角 **设置**。
+2. 选中要用不安全证书时可打开「允许不安全 SSL」。
+3. 打开 **开启 HTTP 编辑**，电视上会出现 `http://192.168.x.x:8787` 和二维码。
+4. 手机扫码（或同一 Wi-Fi 打开该网址）。
+5. 点 **导入链接**，粘贴你的 `vless://` 或 `vmess://`（一行一条），点导入。
+6. 回到电视，在节点列表里选中刚导入的节点（蓝勾）。
+7. 返回首页，点中间 **启动**，同意系统 VPN 授权。
+8. 运行后点右下角 **测试**：走真实 Xray 探测，成功显示「代理正常」。
+
+预置的「东京-1 / 香港-2」等是**示例空节点**，不能科学上网。必须导入你自己的机场链接。
+
+首页：未运行只有「启动」+「设置」；运行中是「停止」+「测试 / 代理正常」。
+
+---
+
+## English — which APK and how to install
+
+| Device | APK |
+| --- | --- |
+| Android 9 / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.0.apk` |
+| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.0.apk` |
+
+Sideload with a USB file manager or `adb install -r <apk>`. Enable HTTP edit on the TV, import `vless://` / `vmess://` from a phone on the same LAN, select the node, press 启动, accept the VPN dialog. **测试** measures delay through the live Xray core.
+
+Demo seed nodes do not proxy traffic — import your own share links.
+
+---
+
+## What is inside
+
+- Real **Xray-core** via [AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite) `libv2ray.aar` **v26.9.9** (LGPL-3.0). Native `libgojni.so` for `armeabi-v7a` + `arm64-v8a`.
+- VpnService TUN fd is passed to `CoreController.startLoop(config, tunFd)` (`xray.tun.fd`). Config uses a **tun** inbound (gVisor) — not a drain stub.
+- ChinaDNS-style split: `geosite:cn` / `geoip:cn` / private → direct; else → VLESS/VMess. `allowInsecure` is honored.
+- Bundled geo assets + 7-day Loyalsoldier refresh after a successful start (failure never blocks VPN).
+- Local Passwall-like web admin when HTTP edit is on.
+- Licenses: [THIRD_PARTY.md](THIRD_PARTY.md). Native notes: [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md).
+
+### Dual APK (developers)
+
+| Flavor | applicationId | minSdk | ABI |
+| --- | --- | --- | --- |
+| **legacy** | `com.passwall.tv.legacy` | 28 | armeabi-v7a + arm64-v8a |
+| **modern** | `com.passwall.tv` | 31 | arm64-v8a |
+
+```bash
+./scripts/fetch-libv2ray.sh   # also runs automatically on assemble
+./gradlew assembleLegacyRelease assembleModernRelease
+./scripts/package-release-apks.sh
+```
+
+Release APKs are signed with the **debug keystore** so you can sideload immediately. Replace the keystore before any store upload.
+
+UI is Compose + D-pad on both flavors (Leanback not used). Legacy avoids API 29+ VpnService helpers, MTU 1500, IPv6 off, `useLegacyPackaging` so `.so` is extracted on kernel 4.x.
 
 ### Modules
 
 | Module | Role |
 | --- | --- |
-| `app` | TV Compose UI, `VpnService` + foreground notification, API 28+ permissions |
-| `data` | Room, `vless://` / `vmess://` parsers, SSR recognition stub, subscription **fetch** stub |
-| `core-xray` | start / stop / status, Xray JSON (ChinaDNS split + `allowInsecure`), bundled geoip/geosite, 7-day refresh, JNI TODO |
-| `admin-web` | Ktor CIO on LAN, static admin, REST, TCP ping. Runs only when HTTP edit is on |
+| `app` | TV UI, VpnService, VPN permission |
+| `data` | Room, vless/vmess parsers, subscription fetch stub |
+| `core-xray` | libv2ray engine, tun JSON, geo assets + 7-day update |
+| `admin-web` | Ktor + REST + TCP ping |
 
-### Dual APK
+SSR is recognized only (no outbound). Subscription **HTTP fetch** is still a stub; paste links instead.
 
-| Flavor | applicationId | minSdk | ABI | When to use |
-| --- | --- | --- | --- | --- |
-| **legacy** | `com.passwall.tv.legacy` | **28** (Android 9) | `armeabi-v7a` + `arm64-v8a` | Old TV boxes, Linux kernel 4.x |
-| **modern** | `com.passwall.tv` | **31** | `arm64-v8a` | Newer TVs |
+### Routing asset update
 
-Shared business code lives in `data`, `core-xray`, and `admin-web`. Flavors only change `minSdk`, ABI, IPv6 on the TUN, and `applicationId`.
+After every successful start, if Room `routingAssetsUpdatedAt` is missing or older than 7 days, download Loyalsoldier `geoip.dat` / `geosite.dat` / `direct-list.txt` (jsDelivr → Fastly → GitHub). Keep last-good on failure. URLs: `core-xray/src/main/assets/xray/SOURCES.txt`.
 
-```bash
-./gradlew assembleLegacyRelease
-./gradlew assembleModernRelease
-# also: assembleLegacyDebug / assembleModernDebug
-```
+### Build
 
-Outputs: `app/build/outputs/apk/<flavor>/release/`.
-
-Release builds sign with the debug keystore so local assemble works. Replace that before any store upload.
-
-### UI toolkit (API 28)
-
-**Compose for Android + D-pad focus**, not Leanback.
-
-`androidx.tv:tv-material` already supports minSdk 21, so both flavors share one Compose UI. Leanback is unused. Modern does not switch to a second toolkit — same screens, higher `minSdk` and 64-bit only.
-
-### Android 9 / kernel 4.x notes (`legacy`)
-
-- minSdk 28, 32-bit ABI kept.
-- TUN MTU 1500; IPv6 off on legacy (some 4.x kernels mishandle IPv6 tun).
-- No API 29+ `VpnService.Builder` helpers (`setMetered`, HTTP proxy).
-- `packaging.jniLibs.useLegacyPackaging = true` so `.so` is extracted (friendlier on old boxes).
-- Conservative deps; no NDK required for the default stub build.
-- When you add libxray, build `armeabi-v7a` **and** `arm64-v8a`; avoid 16 KB-only page-size binaries for this flavor.
-
-### Drop in Xray native
-
-See [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md). Until then:
-
-- Config is real (VLESS/VMess outbound, geosite:cn / geoip:cn / private → `freedom`).
-- Engine is `StubXrayEngine`: writes JSON, reports RUNNING, drains TUN. **No packet forwarding.**
-- SSR: link is recognized; outbound is a TODO placeholder.
-
-### Routing assets (geoip / geosite / ChinaDNS)
-
-Defaults are **bundled in the APK** under `core-xray/src/main/assets/xray/` and copied to `filesDir/xray/` (next to `xray-config.json`) on first run. Last-good downloaded files are never overwritten by the APK copy.
-
-| File | Bundled default | Purpose |
-| --- | --- | --- |
-| `geoip.dat` | Loyalsoldier `geoip-only-cn-private.dat` (~134KB) | `geoip:cn`, `geoip:private` |
-| `geosite.dat` | Compact list from `scripts/generate-geosite.py` | `geosite:cn`, `geosite:geolocation-!cn`, `geosite:category-ads-all` |
-| `direct-list.txt` | Loyalsoldier ChinaDNS-style domain list | cn → direct domains |
-| `cn-cidr.txt` | [17mon/china_ip_list](https://github.com/17mon/china_ip_list) | ChinaDNS-style IPv4 CIDRs |
-
-**Update behavior:** after **every successful proxy start**, the app checks `app_settings.routingAssetsUpdatedAt` in Room. If it is missing or older than **7 days**, it downloads the full Loyalsoldier files **once** (jsDelivr → Fastly → GitHub). Failure keeps the bundled/last-good files and does **not** block VPN start. A failed attempt is retried at most every 6 hours. The new timestamp is written only after all remote files succeed.
-
-Remote URLs (see also `core-xray/src/main/assets/xray/SOURCES.txt`):
-
-```
-https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat
-https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat
-https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/direct-list.txt
-https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/<same>
-https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/<same>
-```
-
-Regenerate the compact geosite default:
-
-```bash
-python3 scripts/generate-geosite.py
-```
-
-### Web admin
-
-On Settings → 开启 HTTP 编辑, Ktor listens on `0.0.0.0:8787`. TV shows `http://<LAN>:8787` and a QR.
-
-```
-GET  /api/status
-GET  /api/nodes
-POST /api/nodes/import          { "text": "vless://...\\nvmess://..." }
-POST /api/nodes/{id}/select
-POST /api/nodes/{id}/ping
-POST /api/nodes/latency
-POST /api/nodes/tcp-ping
-GET|POST|DELETE /api/subscriptions
-POST /api/subscriptions/{id}/refresh   # stub fetch
-PUT  /api/settings
-POST /api/proxy/start|stop
-```
-
-Static preview (no device):
-
-```bash
-./scripts/preview-admin.sh 18787
-```
-
-### Build environment
-
-- JDK 17+ (21 OK)
-- Android SDK Platform 35, Build-Tools 35.0.0
-- Gradle 8.11.1 / AGP 8.7.3 / Kotlin 2.0.21
-- NDK **optional** (`-Ppasswall.enableNativeStub=true`)
+JDK 17+, Android SDK 35. `libv2ray.aar` is **not** in git (~59MB); `scripts/fetch-libv2ray.sh` pulls v26.9.9.
 
 ```properties
-# local.properties
 sdk.dir=/path/to/Android/Sdk
 ```
-
-```bash
-./gradlew :data:test :core-xray:test
-./gradlew assembleLegacyRelease assembleModernRelease
-```
-
-### Later GitHub sync
-
-Keep this repo pushable. When you create `Maksim-venus/android-tv-xray`, add that remote and push `main`. Do not depend on GitHub for day-to-day work here.
-
----
-
-## 中文
-
-面向国内市场的 Android 电视 Xray 代理客户端：双 APK、中文遥控器界面、局域网 Web 管理、VpnService + 国内分流配置。
-
-GitHub 仓库（`Maksim-venus/android-tv-xray`）**稍后上传**。当前以本 Origin 仓库为准。
-
-### 功能
-
-1. 首页未运行：中央「启动」+ 右上「设置」，无侧栏。
-2. 首页运行中：中央「停止」+「设置」+ 右下「测试 / 代理正常」。
-3. 设置：只读节点（VLESS / VMess 徽章）、选择节点、「允许不安全 SSL」、「开启 HTTP 编辑」后显示局域网 URL 与二维码。电视上不提供文本输入。
-4. Web 管理（Passwall 风格）：导入链接、订阅、测延迟、TCP Ping。
-
-### 双 APK
-
-| 变体 | 包名 | minSdk | ABI | 用途 |
-| --- | --- | --- | --- | --- |
-| **legacy** | `com.passwall.tv.legacy` | 28（Android 9） | armeabi-v7a + arm64-v8a | 老盒子 / Linux 4.x 内核 |
-| **modern** | `com.passwall.tv` | 31 | arm64-v8a | 新电视 |
-
-```bash
-./gradlew assembleLegacyRelease
-./gradlew assembleModernRelease
-```
-
-### 界面实现
-
-两款 APK **共用 Compose + 遥控器焦点**，不用 Leanback。`androidx.tv` 的 minSdk 为 21，Android 9 可用。
-
-### 老设备注意
-
-- 保留 32 位；TUN MTU 1500；legacy 关闭 IPv6。
-- 不使用 API 29+ 的 VpnService API。
-- 默认把 `.so` 解压到文件系统，兼容部分 4.x 内核加载器。
-- 接入原生库时必须同时打 `armeabi-v7a`。
-
-### 接入真实 Xray
-
-见 [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md)。当前为明确 Stub：配置文件会生成，流量不会真正转发。SSR 仅识别链接。订阅 HTTP 拉取为 TODO，正文解析（Base64 / 逐行链接）已实现。
-
-### 模块
-
-- `app`：电视 UI、VpnService、前台通知
-- `data`：Room、分享链接解析、订阅拉取 Stub
-- `core-xray`：启停与状态、分流 JSON、内置 geoip/geosite、7 天自动更新、JNI 预留
-
-### 分流规则资源
-
-APK 内置 `geoip.dat`（Loyalsoldier 仅 CN+内网）、精简 `geosite.dat`、`direct-list.txt`、`cn-cidr.txt`，首次运行复制到 `filesDir/xray/`。每次**代理启动成功后**检查 Room 字段 `routingAssetsUpdatedAt`：超过 **7 天**（或从未成功更新）则后台下载 Loyalsoldier 全量 geoip/geosite/direct-list（jsDelivr → Fastly → GitHub）。失败则继续用内置/上次成功文件，**不阻止 VPN 启动**。时间戳仅在全部下载成功后写入。地址见 `core-xray/src/main/assets/xray/SOURCES.txt`。
-- `admin-web`：Ktor + 静态管理页 + REST + TCP Ping（仅 HTTP 编辑开启时）

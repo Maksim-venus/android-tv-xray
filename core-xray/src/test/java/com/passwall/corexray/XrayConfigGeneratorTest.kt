@@ -26,5 +26,7 @@ class XrayConfigGeneratorTest {
         assertTrue(json.contains("vless"))
         assertTrue(json.contains("223.5.5.5"))
         assertTrue(json.contains("outboundTag"))
+        assertTrue(json.contains("\"protocol\": \"tun\""))
+        assertTrue(json.contains("tun-in"))
     }
 }

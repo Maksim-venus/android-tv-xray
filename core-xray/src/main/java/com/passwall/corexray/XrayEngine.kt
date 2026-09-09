@@ -1,11 +1,14 @@
 package com.passwall.corexray
 
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import libv2ray.CoreCallbackHandler
+import libv2ray.CoreController
+import libv2ray.Libv2ray
 import java.io.File
-import java.io.FileInputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
 enum class XrayState {
@@ -19,9 +22,16 @@ data class XrayStatus(
     val state: XrayState = XrayState.STOPPED,
     val message: String = "",
     val configPath: String? = null,
-    val nativeAvailable: Boolean = false,
+    val nativeAvailable: Boolean = true,
     val lastError: String? = null,
-    val usingStub: Boolean = true,
+    val usingStub: Boolean = false,
+    val coreVersion: String = "",
+)
+
+data class DelayResult(
+    val ok: Boolean,
+    val latencyMs: Long? = null,
+    val error: String? = null,
 )
 
 interface XrayEngine {
@@ -29,118 +39,116 @@ interface XrayEngine {
     fun start(config: GeneratedConfig, configFile: File, tun: ParcelFileDescriptor?)
     fun stop()
     fun isRunning(): Boolean
+    fun measureProxyDelay(url: String = DEFAULT_PROBE_URL): DelayResult
 }
 
+const val DEFAULT_PROBE_URL = "https://www.gstatic.com/generate_204"
+
 /**
- * In-process stub used until libxray / AndroidLibXrayLite is dropped in.
+ * Real Xray-core via AndroidLibXrayLite (libv2ray.aar).
  *
- * It writes the generated JSON, reports RUNNING, and drains the TUN fd so the
- * VpnService interface does not back-pressure. Packets are NOT forwarded.
- *
- * JNI TODO: replace [start]/[stop] with gomobile bindings, e.g.
- * `libv2ray.Libv2ray.runXray(configPath)` or `CoreController.StartLoop`.
+ * startLoop(config, tunFd) sets xray.tun.fd; the generated JSON uses a `tun`
+ * inbound so gVisor reads the VpnService descriptor. No drain-only stub.
  */
-class StubXrayEngine : XrayEngine {
+class Libv2rayEngine : XrayEngine {
     private val running = AtomicBoolean(false)
-    private val _status = MutableStateFlow(XrayStatus())
+    private val _status = MutableStateFlow(XrayStatus(coreVersion = versionOrUnknown()))
     override val status: StateFlow<XrayStatus> = _status.asStateFlow()
 
-    @Volatile
-    private var drainThread: Thread? = null
-
-    override fun start(config: GeneratedConfig, configFile: File, tun: ParcelFileDescriptor?) {
-        stop()
-        _status.value = XrayStatus(state = XrayState.STARTING, message = "正在写入配置…", usingStub = true)
-        configFile.parentFile?.mkdirs()
-        configFile.writeText(config.json)
-        running.set(true)
-        if (tun != null) {
-            drainThread = Thread({ drainTun(tun) }, "passwall-tun-drain").also { it.start() }
+    private val callback = object : CoreCallbackHandler {
+        override fun startup(): Long = 0
+        override fun shutdown(): Long = 0
+        override fun onEmitStatus(p0: Long, p1: String?): Long {
+            Log.i(TAG, "core: $p1")
+            return 0
         }
-        _status.value = XrayStatus(
-            state = XrayState.RUNNING,
-            message = "Xray 引擎为本地 Stub（尚未加载 libxray）。配置已生成。",
-            configPath = configFile.absolutePath,
-            nativeAvailable = NativeXrayBridge.isAvailable(),
-            usingStub = true,
-        )
     }
 
+    @Volatile
+    private var controller: CoreController? = null
+
+    @Synchronized
+    override fun start(config: GeneratedConfig, configFile: File, tun: ParcelFileDescriptor?) {
+        stop()
+        _status.value = XrayStatus(
+            state = XrayState.STARTING,
+            message = "正在启动 Xray…",
+            usingStub = false,
+            coreVersion = versionOrUnknown(),
+        )
+        if (tun == null) {
+            throw IllegalStateException("VpnService TUN 未建立，无法启动 Xray")
+        }
+        configFile.parentFile?.mkdirs()
+        configFile.writeText(config.json)
+        val assetDir = configFile.parentFile?.absolutePath
+            ?: throw IllegalStateException("缺少 Xray 资源目录")
+        Libv2ray.initCoreEnv(assetDir, "")
+        val core = Libv2ray.newCoreController(callback)
+        controller = core
+        try {
+            core.startLoop(config.json, tun.fd)
+        } catch (t: Throwable) {
+            controller = null
+            running.set(false)
+            _status.value = XrayStatus(
+                state = XrayState.ERROR,
+                message = t.message ?: t.javaClass.simpleName,
+                lastError = t.message,
+                usingStub = false,
+                coreVersion = versionOrUnknown(),
+            )
+            throw t
+        }
+        running.set(true)
+        _status.value = XrayStatus(
+            state = XrayState.RUNNING,
+            message = "Xray 已运行 ${versionOrUnknown()}",
+            configPath = configFile.absolutePath,
+            nativeAvailable = true,
+            usingStub = false,
+            coreVersion = versionOrUnknown(),
+        )
+        Log.i(TAG, "started ${versionOrUnknown()} tunFd=${tun.fd}")
+    }
+
+    @Synchronized
     override fun stop() {
+        val core = controller
+        controller = null
         running.set(false)
-        drainThread?.interrupt()
-        drainThread = null
+        if (core != null) {
+            runCatching { core.stopLoop() }
+        }
         _status.value = XrayStatus(
             state = XrayState.STOPPED,
             message = "已停止",
-            nativeAvailable = NativeXrayBridge.isAvailable(),
-            usingStub = true,
+            nativeAvailable = true,
+            usingStub = false,
+            coreVersion = versionOrUnknown(),
         )
     }
 
-    override fun isRunning(): Boolean = running.get() && _status.value.state == XrayState.RUNNING
+    override fun isRunning(): Boolean = running.get() && (controller?.isRunning == true)
 
-    private fun drainTun(tun: ParcelFileDescriptor) {
-        // TODO(jni): hand this fd to tun2socks / libxray instead of discarding packets.
-        try {
-            FileInputStream(tun.fileDescriptor).use { input ->
-                val buf = ByteArray(32767)
-                while (running.get()) {
-                    val n = input.read(buf)
-                    if (n <= 0) break
-                }
-            }
-        } catch (_: Throwable) {
-            // Closed when VpnService tears down the interface.
+    override fun measureProxyDelay(url: String): DelayResult {
+        val core = controller
+        if (core == null || !isRunning()) {
+            return DelayResult(false, error = "代理未运行")
         }
-    }
-}
-
-/**
- * Optional JNI boundary. The default APK does not ship a compiled .so.
- * After you drop in `libv2ray.aar` (see README), call these methods from [XrayEngine].
- */
-object NativeXrayBridge {
-    private val loaded: Boolean by lazy {
-        runCatching { System.loadLibrary("xray_stub") }.isSuccess
-    }
-
-    fun isAvailable(): Boolean = loaded
-
-    @JvmStatic
-    external fun nativeVersion(): String
-
-    @JvmStatic
-    external fun nativeStart(configPath: String): Int
-
-    @JvmStatic
-    external fun nativeStop(): Int
-}
-
-class NativeXrayEngine(
-    private val fallback: XrayEngine = StubXrayEngine(),
-) : XrayEngine {
-    override val status: StateFlow<XrayStatus> get() = fallback.status
-
-    override fun start(config: GeneratedConfig, configFile: File, tun: ParcelFileDescriptor?) {
-        if (!NativeXrayBridge.isAvailable()) {
-            fallback.start(config, configFile, tun)
-            return
-        }
-        configFile.parentFile?.mkdirs()
-        configFile.writeText(config.json)
-        val code = runCatching { NativeXrayBridge.nativeStart(configFile.absolutePath) }.getOrDefault(-1)
-        if (code != 0) {
-            fallback.start(config, configFile, tun)
+        return try {
+            val ms = core.measureDelay(url)
+            if (ms >= 0) DelayResult(true, ms)
+            else DelayResult(false, error = "探测失败")
+        } catch (t: Throwable) {
+            DelayResult(false, error = t.message ?: t.javaClass.simpleName)
         }
     }
 
-    override fun stop() {
-        if (NativeXrayBridge.isAvailable()) {
-            runCatching { NativeXrayBridge.nativeStop() }
-        }
-        fallback.stop()
-    }
+    companion object {
+        private const val TAG = "passwall-xray"
 
-    override fun isRunning(): Boolean = fallback.isRunning()
+        fun versionOrUnknown(): String =
+            runCatching { Libv2ray.checkVersionX() }.getOrDefault("libv2ray")
+    }
 }

@@ -87,6 +87,8 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":core-xray"))
     implementation(project(":admin-web"))
+    // Packages libv2ray classes + libgojni.so (armeabi-v7a / arm64-v8a).
+    implementation(files("${project(":core-xray").projectDir}/libs/libv2ray.aar"))
 
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
@@ -108,4 +110,8 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+}
+
+tasks.named("preBuild") {
+    dependsOn(":core-xray:fetchLibv2ray")
 }

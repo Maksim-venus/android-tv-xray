@@ -47,6 +47,7 @@ object XrayConfigGenerator {
             })
             put("dns", chinaDns(enableIpv6))
             put("inbounds", buildJsonArray {
+                add(tunInbound())
                 add(socksInbound(socksPort))
             })
             put("outbounds", buildJsonArray {
@@ -123,6 +124,20 @@ object XrayConfigGenerator {
         if (domain != null) put("domain", jsonStrings(*domain.toTypedArray()))
         if (ip != null) put("ip", jsonStrings(*ip.toTypedArray()))
         if (network != null) put("network", JsonPrimitive(network))
+    }
+
+    private fun tunInbound(): JsonObject = buildJsonObject {
+        put("tag", JsonPrimitive("tun-in"))
+        put("protocol", JsonPrimitive("tun"))
+        put("settings", buildJsonObject {
+            put("name", JsonPrimitive("passwall0"))
+            put("mtu", JsonPrimitive(1500))
+        })
+        put("sniffing", buildJsonObject {
+            put("enabled", JsonPrimitive(true))
+            put("destOverride", jsonStrings("http", "tls", "quic"))
+            put("routeOnly", JsonPrimitive(true))
+        })
     }
 
     private fun socksInbound(port: Int): JsonObject = buildJsonObject {

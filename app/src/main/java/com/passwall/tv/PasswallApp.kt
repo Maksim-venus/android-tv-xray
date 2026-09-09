@@ -3,7 +3,7 @@ package com.passwall.tv
 import android.app.Application
 import com.passwall.adminweb.AdminRuntime
 import com.passwall.adminweb.AdminServer
-import com.passwall.corexray.NativeXrayEngine
+import com.passwall.corexray.Libv2rayEngine
 import com.passwall.corexray.RoutingAssetStore
 import com.passwall.corexray.RoutingAssetUpdater
 import com.passwall.corexray.XrayEngine
@@ -37,7 +37,7 @@ class PasswallApp : Application() {
         routingAssets = RoutingAssetStore(this)
         routingAssets.installBundledDefaults()
         assetUpdater = RoutingAssetUpdater(routingAssets, repository)
-        engine = NativeXrayEngine()
+        engine = Libv2rayEngine()
         adminServer = AdminServer(
             context = this,
             repository = repository,

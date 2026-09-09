@@ -55,6 +55,8 @@ class ProxyVpnService : VpnService() {
                 .addDnsServer("223.5.5.5")
                 .setMtu(1500)
                 .setBlocking(false)
+            // Keep Xray's own sockets off the TUN so the node connection cannot loop.
+            runCatching { builder.addDisallowedApplication(packageName) }
             if (BuildConfig.ENABLE_IPV6) {
                 builder.addAddress("fd00:85::2", 128)
                 builder.addRoute("::", 0)

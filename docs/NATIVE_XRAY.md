@@ -1,58 +1,35 @@
-# Drop in real Xray native
+# Xray native core (shipped)
 
-The APK ships a **VpnService shell** and a **Kotlin stub engine**. Packets from the TUN interface are drained, not forwarded. Generated `xray-config.json` is written to the app files directory on every start.
+Both APK flavors embed **AndroidLibXrayLite v26.9.9** (`libv2ray.aar`).
 
-## Recommended AAR: AndroidLibXrayLite
+## Runtime path
 
-1. Build or download `libv2ray.aar` from [2dust/AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite):
+1. `VpnService` creates a TUN (`10.0.85.2/32`, default route, DNS 8.8.8.8 + 223.5.5.5).
+2. The app package is `addDisallowedApplication` so Xray’s own sockets do not loop into the TUN.
+3. `Libv2ray.initCoreEnv(filesDir/xray, "")` so `geoip.dat` / `geosite.dat` resolve.
+4. `CoreController.startLoop(json, tun.fd)` sets `xray.tun.fd`. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`.
+5. Routing: `geosite:cn` / `geoip:cn` / `geoip:private` → freedom; else → selected VLESS/VMess outbound.
+6. 「测试」calls `CoreController.measureDelay` through the running core.
 
-   ```bash
-   # Go 1.21+, NDK r26+ (r26.1.10909125 is a known-good pin)
-   gomobile bind -v -androidapi 21 -trimpath ./
-   ```
-
-2. Copy the AAR:
-
-   ```text
-   core-xray/libs/libv2ray.aar
-   ```
-
-3. In `core-xray/build.gradle.kts` add:
-
-   ```kotlin
-   dependencies {
-       implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
-   }
-   ```
-
-4. Replace `NativeXrayEngine` / `StubXrayEngine.start` with the gomobile API, typically:
-
-   ```text
-   Libv2ray.initCoreEnv(...)
-   Libv2ray.runXray(configPath)   // or CoreController.StartLoop
-   ```
-
-5. Hand the TUN `ParcelFileDescriptor` to tun2socks / gVisor as required by that AAR. The drain thread in `StubXrayEngine` is the placeholder.
-
-6. Point the core at `filesDir/xray/` (same folder as `xray-config.json`). The APK already installs `geoip.dat` / `geosite.dat` there and refreshes them from Loyalsoldier after a successful start if the Room timestamp is older than 7 days. Call `InitCoreEnv` with that directory. Split routing in `XrayConfigGenerator` already references `geosite:cn` and `geoip:cn`.
-
-## Optional C stub
+## Fetch the AAR (developers)
 
 ```bash
-./gradlew :core-xray:assembleDebug -Ppasswall.enableNativeStub=true
+./scripts/fetch-libv2ray.sh
+# or just assemble — preBuild downloads it
+./gradlew assembleLegacyRelease assembleModernRelease
 ```
 
-Requires NDK + CMake 3.22.1. Symbols:
+Pinned URL:
 
-- `Java_com_passwall_corexray_NativeXrayBridge_nativeVersion`
-- `Java_com_passwall_corexray_NativeXrayBridge_nativeStart`
-- `Java_com_passwall_corexray_NativeXrayBridge_nativeStop`
+`https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.9.9/libv2ray.aar`
 
-## ABI / NDK
+Licenses: [THIRD_PARTY.md](../THIRD_PARTY.md).
 
-| Flavor | minSdk | ABI | Notes |
-| --- | --- | --- | --- |
-| `legacy` | 28 | `armeabi-v7a`, `arm64-v8a` | Old TV boxes, 32-bit + 64-bit, extract `.so` (`useLegacyPackaging`) |
-| `modern` | 31 | `arm64-v8a` | Newer TVs only |
+## ABI
 
-Do **not** require 16 KB page-size-only natives for `legacy`. Prefer NDK r26 on kernel 4.x boxes; newer NDKs are fine for `modern`.
+| Flavor | ABIs taken from the AAR |
+| --- | --- |
+| legacy | `armeabi-v7a`, `arm64-v8a` (`libgojni.so`) |
+| modern | `arm64-v8a` |
+
+x86 / x86_64 slices in the AAR are stripped by `ndk.abiFilters`.
