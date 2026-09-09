@@ -99,7 +99,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 ToggleRow(
                     title = "允许不安全 SSL",
-                    subtitle = "当前核心已取消跳过证书校验。开启后按证书名验证（vcn）；自签证书请在链接提供 pcs。",
+                    subtitle = "当前核心 Xray 26.1.13 仍支持跳过证书校验。开启后写入 allowInsecure。",
                     checked = state.allowInsecure,
                     onClick = { onToggleInsecure(!state.allowInsecure) },
                 )
@@ -107,6 +107,12 @@ fun SettingsScreen(
                 HttpEditRow(
                     enabled = state.httpEditEnabled,
                     onClick = { onToggleHttp(!state.httpEditEnabled) },
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "核心 ${com.passwall.corexray.XrayPins.DISPLAY}",
+                    color = TextMuted,
+                    fontSize = 13.sp,
                 )
             }
             Box(Modifier.weight(0.95f).fillMaxHeight()) {

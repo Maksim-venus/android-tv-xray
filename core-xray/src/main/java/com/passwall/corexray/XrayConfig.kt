@@ -279,8 +279,10 @@ object XrayConfigGenerator {
 
     private fun tlsSettings(node: ProxyNode, tlsPolicy: TlsPolicy): JsonObject = buildJsonObject {
         put("serverName", JsonPrimitive(tlsPolicy.serverName))
-        // allowInsecure was removed from this Xray-core; never emit the key.
-        tlsPolicy.verifyPeerCertByName?.let { put("verifyPeerCertByName", JsonPrimitive(it)) }
+        if (tlsPolicy.allowInsecure) {
+            put("allowInsecure", JsonPrimitive(true))
+        }
+        // Do not emit verifyPeerCertByName — 26.1.13 uses verifyPeerCertInNames.
         tlsPolicy.pinnedPeerCertSha256?.let { put("pinnedPeerCertSha256", JsonPrimitive(it)) }
         node.fingerprint?.let { put("fingerprint", JsonPrimitive(it)) }
     }

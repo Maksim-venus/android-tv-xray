@@ -216,7 +216,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
       logs: "日志",
     })[state.view] || "节点管理";
     $("pageSub").textContent = state.view === "system"
-      ? "代理启停、证书名验证（vcn/pcs）与 HTTP 编辑。外网探测走 SOCKS 而非直连。"
+      ? "代理启停、allowInsecure（Xray 26.1.13）与 HTTP 编辑。外网探测走 SOCKS。"
       : state.view === "logs"
         ? "VPN / Xray 运行记录，便于手机浏览器排查"
         : "集中管理您的代理节点、订阅与网络配置";

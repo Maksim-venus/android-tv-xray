@@ -4,44 +4,30 @@ import com.passwall.data.model.AppSettings
 import com.passwall.data.model.ProxyNode
 
 /**
- * Maps the app's 「允许不安全 SSL」 toggle onto the TLS fields this Xray-core
- * still accepts. `allowInsecure` must never appear in generated JSON.
+ * TLS fields for the pinned Xray-core (v1.260113.0 / AndroidLibXrayLite v26.1.13).
  *
- * Closest supported behavior:
- * - `pinnedPeerCertSha256` (pcs) when the share link provides a SHA-256 pin
- * - `verifyPeerCertByName` (vcn) to verify the cert name (SNI / host / explicit vcn)
- * Skip-verify is no longer possible on this core.
+ * That build still honors `allowInsecure` with no date-based removal.
+ * Do not emit `verifyPeerCertByName` — this core uses `verifyPeerCertInNames`
+ * and newer cores renamed/removed allowInsecure.
  */
 data class TlsPolicy(
     val serverName: String,
-    val verifyPeerCertByName: String? = null,
+    val allowInsecure: Boolean = false,
     val pinnedPeerCertSha256: String? = null,
     val note: String? = null,
 ) {
     companion object {
-        const val SKIP_VERIFY_REMOVED_NOTE =
-            "当前 Xray 已取消 allowInsecure（跳过证书校验）。" +
-                "已改为按证书名验证（verifyPeerCertByName / vcn）。" +
-                "自签或私有证书请在分享链接中提供 pcs（证书 SHA-256）。"
-
         fun from(node: ProxyNode, settings: AppSettings): TlsPolicy {
             val serverName = node.sni?.takeIf { it.isNotBlank() } ?: node.host
             val pin = normalizePin(node.pinnedPeerCertSha256)
-            val explicitVcn = node.verifyPeerCertByName?.trim()?.takeIf { it.isNotEmpty() }
             val insecureRequested = settings.allowInsecureSsl || node.allowInsecure
-            val vcn = when {
-                explicitVcn != null -> explicitVcn
-                insecureRequested -> serverName
-                else -> null
-            }
             val note = when {
-                !insecureRequested -> null
-                pin != null -> "已使用链接中的证书指纹（pcs）代替已移除的跳过校验。"
-                else -> SKIP_VERIFY_REMOVED_NOTE
+                insecureRequested -> "已写入 allowInsecure（当前核心 Xray 26.1.13 仍支持跳过证书校验）。"
+                else -> null
             }
             return TlsPolicy(
                 serverName = serverName,
-                verifyPeerCertByName = vcn,
+                allowInsecure = insecureRequested,
                 pinnedPeerCertSha256 = pin,
                 note = note,
             )

@@ -1,6 +1,15 @@
 # Xray native core (shipped)
 
-Both APK flavors embed **AndroidLibXrayLite v26.9.9** (`libv2ray.aar`).
+Both APK flavors embed **AndroidLibXrayLite v26.1.13** (`libv2ray.aar`) with **Xray-core v1.260113.0**.
+
+Exact Xray-core **1.8.3** is not used: the official 1.8.x `libv2ray.aar` builds (`1.8.11`, `1.8.24`) only expose `V2RayPoint.RunLoop` and have no tun inbound. This app needs `CoreController.startLoop(json, tunFd)` plus gVisor TUN.
+
+v26.1.13 is the last well-verified published AAR that:
+
+- still accepts `tlsSettings.allowInsecure` (no “feature has been removed” date bomb; that landed in Xray v26.2.6 / commit 2c92339)
+- keeps `startLoop(String, int)`
+- ships `armeabi-v7a` + `arm64-v8a`
+- includes the tun inbound / `xray.tun.fd`
 
 ## Runtime path
 
@@ -9,8 +18,8 @@ Both APK flavors embed **AndroidLibXrayLite v26.9.9** (`libv2ray.aar`).
 3. `Libv2ray.initCoreEnv(filesDir/xray, "")` so `geoip.dat` / `geosite.dat` resolve.
 4. `CoreController.startLoop(json, tun.fd)` sets process env `xray.tun.fd`. The same fd is also written into the JSON root `env` object. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`.
 5. Routing: `geosite:cn` / `geoip:cn` / `geoip:private` → freedom; else → selected VLESS/VMess outbound.
-6. 「测试」sends HTTPS GET to `generate_204` via the local SOCKS inbound (`127.0.0.1:10808`) so the request goes through Xray routing → the selected outbound. The app package is excluded from TUN, so a direct HTTP client would not test the proxy. `measureDelay` is optional extra “链路” timing only.
-7. TLS JSON never includes `allowInsecure` (removed in this core). Use `verifyPeerCertByName` / `pinnedPeerCertSha256` from the share link (`vcn` / `pcs`).
+6. 「测试」sends HTTPS GET to `generate_204` via the local SOCKS inbound (`127.0.0.1:10808`) so the request goes through Xray routing → the selected outbound. `measureDelay` is optional extra “链路” timing only.
+7. TLS: when 「允许不安全 SSL」 is on, emit `allowInsecure: true`. Do not emit `verifyPeerCertByName` (this core uses `verifyPeerCertInNames`). Optional `pinnedPeerCertSha256` is accepted if the share link has `pcs`.
 
 ## Fetch the AAR (developers)
 
@@ -22,7 +31,7 @@ Both APK flavors embed **AndroidLibXrayLite v26.9.9** (`libv2ray.aar`).
 
 Pinned URL:
 
-`https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.9.9/libv2ray.aar`
+`https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.1.13/libv2ray.aar`
 
 Licenses: [THIRD_PARTY.md](../THIRD_PARTY.md).
 

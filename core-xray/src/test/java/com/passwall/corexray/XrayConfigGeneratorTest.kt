@@ -10,7 +10,7 @@ import org.junit.Test
 class XrayConfigGeneratorTest {
 
     @Test
-    fun generatesChinaSplitRoutingWithoutAllowInsecure() {
+    fun generatesChinaSplitRoutingAndOmitsAllowInsecureWhenOff() {
         val json = XrayConfigGenerator.generate(sampleVless(), AppSettings(allowInsecureSsl = false)).json
         assertTrue(json.contains("geosite:cn"))
         assertTrue(json.contains("geoip:cn"))
@@ -21,35 +21,39 @@ class XrayConfigGeneratorTest {
         assertTrue(json.contains("\"protocol\": \"tun\""))
         assertTrue(json.contains("tun-in"))
         assertTrue(json.contains("\"port\": 0"))
-        assertNoAllowInsecure(json)
         assertTrue(json.contains("\"serverName\": \"tokyo-1.example.com\""))
-        assertFalse(json.contains("verifyPeerCertByName"))
-        assertFalse(json.contains("pinnedPeerCertSha256"))
+        assertFalse(json.contains("allowInsecure"))
+        assertNoNewerOnlyTlsFields(json)
     }
 
     @Test
-    fun insecureToggleNeverEmitsAllowInsecureAndUsesVcn() {
+    fun insecureToggleEmitsAllowInsecureTrue() {
         val generated = XrayConfigGenerator.generate(
             sampleVless(),
             AppSettings(allowInsecureSsl = true),
         )
-        assertNoAllowInsecure(generated.json)
-        assertTrue(generated.json.contains("\"verifyPeerCertByName\": \"tokyo-1.example.com\""))
+        assertTrue(generated.json.contains("\"allowInsecure\": true"))
         assertTrue(generated.json.contains("\"tlsSettings\""))
-        assertTrue(generated.notes.any { it.contains("allowInsecure") || it.contains("证书名") })
+        assertNoNewerOnlyTlsFields(generated.json)
+        assertTrue(generated.notes.any { it.contains("allowInsecure") })
     }
 
     @Test
-    fun nodePinEmitsPcsWhenToggleOn() {
+    fun nodeFlagAlsoEnablesAllowInsecure() {
+        val node = sampleVless().copy(allowInsecure = true)
+        val json = XrayConfigGenerator.generate(node, AppSettings(allowInsecureSsl = false)).json
+        assertTrue(json.contains("\"allowInsecure\": true"))
+        assertNoNewerOnlyTlsFields(json)
+    }
+
+    @Test
+    fun pinIsOptionalAndDoesNotReplaceAllowInsecure() {
         val pin = "e8e2d387fdbffeb38e9c9065cf30a97ee23c0e3d32ee6f78ffae40966befccc9"
-        val node = sampleVless().copy(
-            allowInsecure = true,
-            pinnedPeerCertSha256 = pin,
-        )
-        val generated = XrayConfigGenerator.generate(node, AppSettings(allowInsecureSsl = true))
-        assertNoAllowInsecure(generated.json)
-        assertTrue(generated.json.contains("\"pinnedPeerCertSha256\": \"$pin\""))
-        assertTrue(generated.json.contains("\"verifyPeerCertByName\""))
+        val node = sampleVless().copy(allowInsecure = true, pinnedPeerCertSha256 = pin)
+        val json = XrayConfigGenerator.generate(node, AppSettings(allowInsecureSsl = true)).json
+        assertTrue(json.contains("\"allowInsecure\": true"))
+        assertTrue(json.contains("\"pinnedPeerCertSha256\": \"$pin\""))
+        assertNoNewerOnlyTlsFields(json)
     }
 
     @Test
@@ -67,8 +71,8 @@ class XrayConfigGeneratorTest {
             sni = "cdn.example.com",
             fingerprint = "chrome",
         )
-        val json = XrayConfigGenerator.generate(node, AppSettings()).json
-        assertNoAllowInsecure(json)
+        val json = XrayConfigGenerator.generate(node, AppSettings(allowInsecureSsl = true)).json
+        assertTrue(json.contains("\"allowInsecure\": true"))
         assertTrue(json.contains("\"protocol\": \"vmess\""))
         assertTrue(json.contains("\"network\": \"ws\""))
         assertTrue(json.contains("\"security\": \"tls\""))
@@ -76,6 +80,7 @@ class XrayConfigGeneratorTest {
         assertTrue(json.contains("\"serverName\": \"cdn.example.com\""))
         assertTrue(json.contains("\"fingerprint\": \"chrome\""))
         assertTrue(json.contains("\"path\": \"/v\""))
+        assertNoNewerOnlyTlsFields(json)
     }
 
     @Test
@@ -88,10 +93,11 @@ class XrayConfigGeneratorTest {
             fingerprint = "chrome",
         )
         val json = XrayConfigGenerator.generate(node, AppSettings(allowInsecureSsl = true)).json
-        assertNoAllowInsecure(json)
         assertTrue(json.contains("\"realitySettings\""))
         assertTrue(json.contains("\"publicKey\": \"pub\""))
         assertFalse(json.contains("\"tlsSettings\""))
+        assertFalse(json.contains("allowInsecure"))
+        assertNoNewerOnlyTlsFields(json)
     }
 
     @Test
@@ -112,8 +118,7 @@ class XrayConfigGeneratorTest {
         sni = "tokyo-1.example.com",
     )
 
-    private fun assertNoAllowInsecure(json: String) {
-        assertFalse(json.contains("allowInsecure"))
-        assertFalse(json.contains("allow_insecure"))
+    private fun assertNoNewerOnlyTlsFields(json: String) {
+        assertFalse(json.contains("verifyPeerCertByName"))
     }
 }

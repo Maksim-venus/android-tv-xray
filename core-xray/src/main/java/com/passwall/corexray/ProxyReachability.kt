@@ -72,7 +72,7 @@ object ProxyReachability {
             conn.connectTimeout = timeoutMs
             conn.readTimeout = timeoutMs
             conn.requestMethod = "GET"
-            conn.setRequestProperty("User-Agent", "PasswallTV/0.1.4")
+            conn.setRequestProperty("User-Agent", "PasswallTV/0.1.5")
             conn.useCaches = false
             val code = conn.responseCode
             val ms = ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(1L)

@@ -28,7 +28,7 @@
       </div>
       <div id="runText">Passwall 已停止</div>
       <div id="lastErrorBox" class="last-error hidden"></div>
-        <div class="ver">v0.1.4</div>
+        <div class="ver">v0.1.5 · Xray 26.1.13</div>
     </div>
   </aside>
 
@@ -99,7 +99,7 @@
           <span>允许不安全 SSL</span>
           <input type="checkbox" id="optInsecure" />
         </label>
-        <p class="hint">当前 Xray 已删除 allowInsecure，无法再跳过证书校验。开启后按证书名验证（vcn）。自签证书请在 vless 链接提供 pcs（SHA-256）。配置里永远不会再写出 allowInsecure。</p>
+        <p class="hint">本版钉住 AndroidLibXrayLite v26.1.13 / Xray-core v1.260113.0，仍支持 allowInsecure。开启后配置会写出 tlsSettings.allowInsecure。官方 1.8.3 AAR 没有 TUN / startLoop，不能用于本应用的 VPN 路径。</p>
         <label class="row">
           <span>开启 HTTP 编辑</span>
           <input type="checkbox" id="optHttp" />

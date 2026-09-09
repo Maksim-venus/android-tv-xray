@@ -10,7 +10,8 @@
     <string name="node_list">节点列表</string>
     <string name="online">在线</string>
     <string name="allow_insecure">允许不安全 SSL</string>
-    <string name="allow_insecure_hint">当前核心已取消跳过证书校验。开启后按证书名验证（vcn）；自签证书请在链接提供 pcs。</string>
+    <string name="allow_insecure_hint">当前核心 Xray 26.1.13 仍支持跳过证书校验。开启后写入 allowInsecure。</string>
+    <string name="xray_core_pin">Xray-core 26.1.13（AndroidLibXrayLite v26.1.13）</string>
     <string name="test_untested">尚未测试外网</string>
     <string name="stopping">正在停止…</string>
     <string name="enable_http_edit">开启 HTTP 编辑</string>

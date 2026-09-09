@@ -41,7 +41,7 @@ class ProxyReachabilityTest {
     }
 
     @Test
-    fun tlsPolicyMapsToggleToVcnNotAllowInsecure() {
+    fun tlsPolicyMapsToggleToAllowInsecure() {
         val policy = TlsPolicy.from(
             com.passwall.data.model.ProxyNode(
                 name = "n",
@@ -54,8 +54,8 @@ class ProxyReachabilityTest {
             com.passwall.data.model.AppSettings(allowInsecureSsl = true),
         )
         assertEquals("www.example.com", policy.serverName)
-        assertEquals("www.example.com", policy.verifyPeerCertByName)
-        assertTrue(policy.note!!.contains("allowInsecure") || policy.note!!.contains("证书名"))
+        assertTrue(policy.allowInsecure)
+        assertTrue(policy.note!!.contains("allowInsecure"))
         assertEquals(null, policy.pinnedPeerCertSha256)
     }
 
