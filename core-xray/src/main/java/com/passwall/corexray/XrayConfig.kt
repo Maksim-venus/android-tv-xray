@@ -50,7 +50,10 @@ object XrayConfigGenerator {
         if (!health.geoipOk) {
             notes += "geoip.dat 无效（${health.geoipError}），直连改用 cn-cidr 列表。"
         }
-        val allowInsecure = settings.allowInsecureSsl || node.allowInsecure
+        val tlsPolicy = TlsPolicy.from(node, settings)
+        if (node.security.equals("tls", true) && tlsPolicy.note != null) {
+            notes += tlsPolicy.note
+        }
         val root = buildJsonObject {
             put("log", buildJsonObject {
                 put("loglevel", JsonPrimitive("warning"))
@@ -61,7 +64,7 @@ object XrayConfigGenerator {
                 add(socksInbound(socksPort))
             })
             put("outbounds", buildJsonArray {
-                add(proxyOutbound(node, allowInsecure, notes))
+                add(proxyOutbound(node, tlsPolicy, notes))
                 add(buildJsonObject {
                     put("tag", JsonPrimitive("direct"))
                     put("protocol", JsonPrimitive("freedom"))
@@ -201,7 +204,7 @@ object XrayConfigGenerator {
 
     private fun proxyOutbound(
         node: ProxyNode,
-        allowInsecure: Boolean,
+        tlsPolicy: TlsPolicy,
         notes: MutableList<String>,
     ): JsonObject {
         val protocol = when (node.protocol) {
@@ -240,19 +243,15 @@ object XrayConfigGenerator {
                 }
                 else -> buildJsonObject {}
             })
-            put("streamSettings", streamSettings(node, allowInsecure))
+            put("streamSettings", streamSettings(node, tlsPolicy))
         }
     }
 
-    private fun streamSettings(node: ProxyNode, allowInsecure: Boolean): JsonObject = buildJsonObject {
+    private fun streamSettings(node: ProxyNode, tlsPolicy: TlsPolicy): JsonObject = buildJsonObject {
         put("network", JsonPrimitive(node.network.ifBlank { "tcp" }))
         put("security", JsonPrimitive(node.security.ifBlank { "none" }))
         if (node.security.equals("tls", true)) {
-            put("tlsSettings", buildJsonObject {
-                put("serverName", JsonPrimitive(node.sni ?: node.host))
-                put("allowInsecure", JsonPrimitive(allowInsecure))
-                node.fingerprint?.let { put("fingerprint", JsonPrimitive(it)) }
-            })
+            put("tlsSettings", tlsSettings(node, tlsPolicy))
         }
         if (node.security.equals("reality", true)) {
             put("realitySettings", buildJsonObject {
@@ -276,6 +275,14 @@ object XrayConfigGenerator {
                 put("serviceName", JsonPrimitive(node.path ?: ""))
             })
         }
+    }
+
+    private fun tlsSettings(node: ProxyNode, tlsPolicy: TlsPolicy): JsonObject = buildJsonObject {
+        put("serverName", JsonPrimitive(tlsPolicy.serverName))
+        // allowInsecure was removed from this Xray-core; never emit the key.
+        tlsPolicy.verifyPeerCertByName?.let { put("verifyPeerCertByName", JsonPrimitive(it)) }
+        tlsPolicy.pinnedPeerCertSha256?.let { put("pinnedPeerCertSha256", JsonPrimitive(it)) }
+        node.fingerprint?.let { put("fingerprint", JsonPrimitive(it)) }
     }
 
     private fun jsonStrings(vararg values: String): JsonArray = buildJsonArray {

@@ -12,7 +12,7 @@ data class StatusDto(
     val allowInsecureSsl: Boolean,
     val httpEditEnabled: Boolean,
     val lanUrl: String,
-    val version: String = "0.1.3",
+    val version: String = "0.1.4",
     val message: String = "",
     val routingAssetsUpdatedAt: Long? = null,
     val lastError: String? = null,
@@ -85,3 +85,13 @@ data class ErrorDto(val error: String)
 
 @Serializable
 data class OkDto(val ok: Boolean = true, val id: Long? = null)
+
+@Serializable
+data class ProbeDto(
+    val ok: Boolean,
+    val latencyMs: Long? = null,
+    val httpStatus: Int? = null,
+    val url: String? = null,
+    val error: String? = null,
+    val message: String = "",
+)

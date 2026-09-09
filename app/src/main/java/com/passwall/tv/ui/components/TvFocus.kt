@@ -87,10 +87,10 @@ fun TvSurface(
         modifier = modifier
             .focusRequester(requester)
             .onPreviewKeyEvent { event ->
-                if (event.key in activateKeys && event.type == KeyEventType.KeyUp) {
+                if (event.key in activateKeys && event.type == KeyEventType.KeyDown) {
                     fire()
                     true
-                } else if (event.key in activateKeys && event.type == KeyEventType.KeyDown) {
+                } else if (event.key in activateKeys && event.type == KeyEventType.KeyUp) {
                     true
                 } else {
                     false
@@ -126,8 +126,10 @@ fun Modifier.tvClickable(
     return this
         .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
         .onPreviewKeyEvent { event ->
-            if (event.key in activateKeys && event.type == KeyEventType.KeyUp) {
+            if (event.key in activateKeys && event.type == KeyEventType.KeyDown) {
                 fire()
+                true
+            } else if (event.key in activateKeys && event.type == KeyEventType.KeyUp) {
                 true
             } else {
                 false

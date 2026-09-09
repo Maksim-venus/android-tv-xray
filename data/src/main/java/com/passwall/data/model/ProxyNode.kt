@@ -21,6 +21,8 @@ data class ProxyNode(
     val shortId: String? = null,
     val spiderX: String? = null,
     val allowInsecure: Boolean = false,
+    val pinnedPeerCertSha256: String? = null,
+    val verifyPeerCertByName: String? = null,
     val rawLink: String = "",
     val source: NodeSource = NodeSource.MANUAL,
     val subscriptionId: Long? = null,

@@ -5,18 +5,22 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.passwall.adminweb.LanAddress
 import com.passwall.adminweb.TcpPinger
+import com.passwall.corexray.ProxyReachability
 import com.passwall.data.model.AppSettings
 import com.passwall.data.model.ProxyNode
 import com.passwall.tv.PasswallApp
 import com.passwall.tv.vpn.ProxyRuntime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class HomeUiState(
     val running: Boolean = false,
+    val stopping: Boolean = false,
     val statusOk: Boolean = false,
     val statusText: String = "",
     val hasNode: Boolean = false,
@@ -36,14 +40,22 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
     private val app = application as PasswallApp
 
     val home: StateFlow<HomeUiState> = combine(
-        ProxyRuntime.isRunning,
-        ProxyRuntime.statusOk,
-        ProxyRuntime.statusMessage,
-        ProxyRuntime.lastError,
-        app.repository.nodesFlow,
-    ) { running, ok, message, error, nodes ->
+        combine(
+            ProxyRuntime.isRunning,
+            ProxyRuntime.isStopping,
+            ProxyRuntime.statusOk,
+        ) { running, stopping, ok -> Triple(running, stopping, ok) },
+        combine(
+            ProxyRuntime.statusMessage,
+            ProxyRuntime.lastError,
+            app.repository.nodesFlow,
+        ) { message, error, nodes -> Triple(message, error, nodes) },
+    ) { run, extra ->
+        val (running, stopping, ok) = run
+        val (message, error, nodes) = extra
         HomeUiState(
-            running = running,
+            running = running || stopping,
+            stopping = stopping,
             statusOk = ok,
             statusText = message,
             hasNode = nodes.isNotEmpty(),
@@ -85,22 +97,25 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
                 ProxyRuntime.markTest(false, "请先在设置或网页导入节点")
                 return@launch
             }
-            if (app.engine.isRunning()) {
-                val throughProxy = app.engine.measureProxyDelay()
-                if (throughProxy.ok) {
-                    app.repository.updateLatency(node.id, throughProxy.latencyMs)
-                    ProxyRuntime.markTest(true, "代理正常 ${throughProxy.latencyMs} ms")
-                    return@launch
+            if (!app.engine.isRunning() && !ProxyRuntime.isRunning.value) {
+                val result = withContext(Dispatchers.IO) { TcpPinger.ping(node) }
+                if (result.ok) {
+                    app.repository.updateLatency(node.id, result.latencyMs)
+                    ProxyRuntime.markTest(false, "节点端口可达，请先启动代理后再测外网")
+                } else {
+                    ProxyRuntime.markTest(false, result.error ?: "节点不可达")
                 }
-                ProxyRuntime.markTest(false, throughProxy.error ?: "代理异常")
                 return@launch
             }
-            val result = TcpPinger.ping(node)
-            if (result.ok) {
-                app.repository.updateLatency(node.id, result.latencyMs)
-                ProxyRuntime.markTest(false, "节点可达，请先启动代理")
+            ProxyRuntime.markTestProgress("正在经代理探测外网…")
+            val http = withContext(Dispatchers.IO) { ProxyReachability.probe() }
+            if (http.ok) {
+                app.repository.updateLatency(node.id, http.latencyMs)
+                val delay = withContext(Dispatchers.IO) { app.engine.measureProxyDelay() }
+                val extra = if (delay.ok && delay.latencyMs != null) "，链路 ${delay.latencyMs} ms" else ""
+                ProxyRuntime.markTest(true, http.message + extra)
             } else {
-                ProxyRuntime.markTest(false, result.error ?: "节点不可达")
+                ProxyRuntime.markTest(false, http.message)
             }
         }
     }

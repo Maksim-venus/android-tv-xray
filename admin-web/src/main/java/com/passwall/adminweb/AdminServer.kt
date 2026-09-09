@@ -221,6 +221,20 @@ class AdminServer(
                         runtime.stopProxy()
                         call.respond(OkDto())
                     }
+                    post("/proxy/probe") {
+                        RuntimeLog.info("网页请求外网探测（经本地 SOCKS / Xray）", "test")
+                        val result = runtime.probeProxy()
+                        call.respond(
+                            ProbeDto(
+                                ok = result.ok,
+                                latencyMs = result.latencyMs,
+                                httpStatus = result.httpStatus,
+                                url = result.url,
+                                error = result.error,
+                                message = result.message,
+                            ),
+                        )
+                    }
                 }
             }
         }

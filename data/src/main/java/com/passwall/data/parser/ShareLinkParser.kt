@@ -86,7 +86,9 @@ object VlessParser {
             publicKey = params["pbk"],
             shortId = params["sid"],
             spiderX = params["spx"],
-            allowInsecure = params["allowInsecure"] == "1" || params["allowInsecure"] == "true",
+            allowInsecure = isTruthy(params["allowInsecure"]) || isTruthy(params["insecure"]),
+            pinnedPeerCertSha256 = firstNonBlank(params["pcs"], params["pinnedPeerCertSha256"]),
+            verifyPeerCertByName = firstNonBlank(params["vcn"], params["verifyPeerCertByName"]),
             rawLink = link,
             source = source,
         )
@@ -121,6 +123,11 @@ object VmessParser {
             sni = json.str("sni").ifBlank { json.str("host").ifBlank { null } },
             encryption = json.str("scy").ifBlank { "auto" },
             fingerprint = json.str("fp").ifBlank { null },
+            allowInsecure = isTruthy(json.str("allowInsecure")) ||
+                isTruthy(json.str("skip-cert-verify")) ||
+                json.str("verify_cert").equals("false", true),
+            pinnedPeerCertSha256 = firstNonBlank(json.str("pcs"), json.str("pinnedPeerCertSha256")),
+            verifyPeerCertByName = firstNonBlank(json.str("vcn"), json.str("verifyPeerCertByName")),
             rawLink = link,
             source = source,
         )
@@ -158,6 +165,14 @@ object SsrParser {
         }
     }
 }
+
+internal fun isTruthy(value: String?): Boolean {
+    val v = value?.trim()?.lowercase() ?: return false
+    return v == "1" || v == "true" || v == "yes"
+}
+
+internal fun firstNonBlank(vararg values: String?): String? =
+    values.firstOrNull { !it.isNullOrBlank() }?.takeIf { it.isNotBlank() }
 
 internal fun parseQuery(query: String): Map<String, String> {
     if (query.isBlank()) return emptyMap()

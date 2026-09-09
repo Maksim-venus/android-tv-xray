@@ -216,7 +216,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
       logs: "日志",
     })[state.view] || "节点管理";
     $("pageSub").textContent = state.view === "system"
-      ? "代理启停、不安全 SSL 与 HTTP 编辑开关"
+      ? "代理启停、证书名验证（vcn/pcs）与 HTTP 编辑。外网探测走 SOCKS 而非直连。"
       : state.view === "logs"
         ? "VPN / Xray 运行记录，便于手机浏览器排查"
         : "集中管理您的代理节点、订阅与网络配置";
@@ -292,10 +292,20 @@ $("btnLatency").onclick = async () => {
 $("btnTcpPing").onclick = async () => {
   try {
     const r = await api("/api/nodes/tcp-ping", { method: "POST", body: "{}" });
-    toast(r.ok ? `TCP Ping ${r.latencyMs} ms` : `失败：${r.error}`);
+    toast(r.ok ? `TCP Ping ${r.latencyMs} ms（仅节点端口）` : `失败：${r.error}`);
     await loadAll();
   } catch (e) { toast(state.demo ? "预览模式无法 TCP Ping" : e.message); }
 };
+
+async function runOutboundProbe() {
+  try {
+    const r = await api("/api/proxy/probe", { method: "POST", body: "{}" });
+    toast(r.message || (r.ok ? "外网可达" : "外网不可达"));
+    await loadAll();
+  } catch (e) { toast(state.demo ? "预览模式无法探测外网" : e.message); }
+}
+if ($("btnProbe")) $("btnProbe").onclick = runOutboundProbe;
+$("btnSysProbe")?.addEventListener("click", runOutboundProbe);
 
 $("nodeBody").onclick = async (ev) => {
   const btn = ev.target.closest("button[data-act]");

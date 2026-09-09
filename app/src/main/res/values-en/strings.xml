@@ -10,6 +10,9 @@
     <string name="node_list">Node list</string>
     <string name="online">Online</string>
     <string name="allow_insecure">Allow insecure SSL</string>
+    <string name="allow_insecure_hint">This Xray build no longer skips certificate checks. The toggle verifies by certificate name (vcn). Self-signed hosts need pcs in the share link.</string>
+    <string name="test_untested">Outbound not tested</string>
+    <string name="stopping">Stopping…</string>
     <string name="enable_http_edit">Enable HTTP edit</string>
     <string name="http_edit_on">HTTP editing enabled</string>
     <string name="http_edit_off">HTTP editing is off. Enable it to manage nodes from a browser on the LAN.</string>

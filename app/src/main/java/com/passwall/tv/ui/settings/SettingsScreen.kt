@@ -99,6 +99,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 ToggleRow(
                     title = "允许不安全 SSL",
+                    subtitle = "当前核心已取消跳过证书校验。开启后按证书名验证（vcn）；自签证书请在链接提供 pcs。",
                     checked = state.allowInsecure,
                     onClick = { onToggleInsecure(!state.allowInsecure) },
                 )
@@ -185,7 +186,7 @@ private fun NodeRow(node: ProxyNode, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ToggleRow(title: String, checked: Boolean, onClick: () -> Unit) {
+private fun ToggleRow(title: String, checked: Boolean, onClick: () -> Unit, subtitle: String? = null) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     Row(
@@ -204,7 +205,13 @@ private fun ToggleRow(title: String, checked: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = Ink, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, color = Ink, fontSize = 17.sp)
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(subtitle, color = TextMuted, fontSize = 13.sp)
+            }
+        }
         val track = if (checked) Accent else Color(0xFFD1D5DB)
         Box(
             Modifier

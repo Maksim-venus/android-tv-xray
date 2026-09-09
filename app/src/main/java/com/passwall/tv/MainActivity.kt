@@ -1,7 +1,6 @@
 package com.passwall.tv
 
 import android.app.Activity
-import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,7 +14,6 @@ import com.passwall.tv.ui.PasswallNav
 import com.passwall.tv.ui.PasswallViewModel
 import com.passwall.tv.ui.theme.PasswallTheme
 import com.passwall.tv.vpn.ProxyRuntime
-import com.passwall.tv.vpn.ProxyVpnService
 
 class MainActivity : ComponentActivity() {
     private val vpnPermissionLauncher = registerForActivityResult(
@@ -45,7 +43,7 @@ class MainActivity : ComponentActivity() {
                     home = home,
                     settings = settings,
                     onStart = { startVpnFromUserAction(vm) },
-                    onStop = { stopService(Intent(this, ProxyVpnService::class.java)) },
+                    onStop = { ProxyRuntime.stopFromUserAction(this) },
                     onTest = { vm.testSelected() },
                     onSelectNode = vm::selectNode,
                     onToggleInsecure = vm::setAllowInsecure,

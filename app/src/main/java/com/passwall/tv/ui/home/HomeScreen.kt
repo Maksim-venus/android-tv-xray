@@ -59,11 +59,11 @@ fun HomeScreen(
             label = "设置",
             leading = { GearIcon(20.dp, Ink) },
         )
-        if (state.running) {
-            StopButton(onStop, Modifier.align(Alignment.Center))
+        if (state.running || state.stopping) {
+            StopButton(onStop, Modifier.align(Alignment.Center), stopping = state.stopping)
             TestCluster(
                 ok = state.statusOk,
-                text = state.statusText.ifBlank { "代理正常" },
+                text = state.statusText,
                 onTest = onTest,
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
@@ -106,7 +106,7 @@ private fun StartButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun StopButton(onClick: () -> Unit, modifier: Modifier) {
+private fun StopButton(onClick: () -> Unit, modifier: Modifier, stopping: Boolean = false) {
     TvSurface(
         onClick = onClick,
         modifier = modifier.width(360.dp).height(104.dp),
@@ -122,7 +122,12 @@ private fun StopButton(onClick: () -> Unit, modifier: Modifier) {
     ) {
         StopIcon(28.dp, Color.White)
         Spacer(Modifier.width(16.dp))
-        Text("停止", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            if (stopping) "正在停止…" else "停止",
+            color = Color.White,
+            fontSize = if (stopping) 28.sp else 34.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -168,7 +173,16 @@ private fun TestCluster(
                     .background(if (ok) OnlineGreen else Danger, CircleShape),
             )
             Spacer(Modifier.width(8.dp))
-            Text(if (ok) "代理正常" else text.ifBlank { "代理异常" }, color = Ink, fontSize = 15.sp)
+            Text(
+                when {
+                    text.isNotBlank() -> text
+                    ok -> "外网可达"
+                    else -> "尚未测试外网"
+                },
+                color = Ink,
+                fontSize = 15.sp,
+                modifier = Modifier.widthIn(max = 360.dp),
+            )
         }
     }
 }

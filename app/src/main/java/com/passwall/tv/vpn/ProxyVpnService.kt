@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
@@ -20,24 +21,35 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class ProxyVpnService : VpnService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var tun: ParcelFileDescriptor? = null
+    private val tornDown = AtomicBoolean(false)
+    private val session = AtomicInteger(0)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            tearDown("已停止")
+            return START_NOT_STICKY
+        }
+        tornDown.set(false)
+        val mySession = session.incrementAndGet()
         startForeground(NOTIFICATION_ID, buildNotification())
-        scope.launch { startProxy() }
-        return START_STICKY
+        scope.launch { startProxy(mySession) }
+        return START_NOT_STICKY
     }
 
-    private suspend fun startProxy() {
+    private suspend fun startProxy(mySession: Int) {
         val app = application as PasswallApp
         val node = app.repository.getSelectedNode()
         if (node == null) {
             ProxyRuntime.markError(getString(R.string.no_node))
-            stopSelf()
+            tearDown("请先在设置或网页导入节点")
             return
         }
         val settings = app.repository.getSettings()
@@ -60,6 +72,7 @@ class ProxyVpnService : VpnService() {
         )
         val configFile = app.routingAssets.configFile()
         try {
+            if (abandoned(mySession)) return
             val builder = Builder()
                 .setSession("Passwall")
                 .addAddress("10.0.85.2", 32)
@@ -79,10 +92,19 @@ class ProxyVpnService : VpnService() {
             tun = builder.establish()
             if (tun == null) {
                 ProxyRuntime.markError("系统未能建立 VPN 通道（TUN 为空）")
-                stopSelf()
+                tearDown("系统未能建立 VPN 通道（TUN 为空）")
+                return
+            }
+            if (abandoned(mySession)) {
+                runCatching { tun?.close() }
+                tun = null
                 return
             }
             generated.notes.forEach { RuntimeLog.warn("配置：$it", "xray") }
+            if (abandoned(mySession)) {
+                runCatching { app.engine.stop() }
+                return
+            }
             try {
                 app.engine.start(generated, configFile, tun)
             } catch (t: Throwable) {
@@ -105,12 +127,17 @@ class ProxyVpnService : VpnService() {
                         extraDirectIps = extraIps,
                     )
                     generated.notes.forEach { RuntimeLog.warn("配置：$it", "xray") }
+                    if (abandoned(mySession)) return
                     app.engine.start(generated, configFile, tun)
                 } else {
                     throw t
                 }
             }
-            ProxyRuntime.markStarted(getString(R.string.proxy_ok))
+            if (abandoned(mySession)) {
+                runCatching { app.engine.stop() }
+                return
+            }
+            ProxyRuntime.markStarted("已启动，请点测试检查外网")
             // Never block start: refresh geoip/geosite in the background.
             scope.launch {
                 val geo = runCatching { app.assetUpdater.refreshAfterSuccessfulStart() }
@@ -125,22 +152,41 @@ class ProxyVpnService : VpnService() {
                 }
             }
         } catch (t: Throwable) {
+            if (abandoned(mySession)) return
             ProxyRuntime.markError("配置或引擎启动失败：${t.message ?: t.javaClass.simpleName}")
-            stopSelf()
+            tearDown("配置或引擎启动失败")
         }
     }
 
-    override fun onDestroy() {
+    private fun abandoned(mySession: Int): Boolean =
+        tornDown.get() || mySession != session.get() || !scope.isActive
+
+    private fun tearDown(message: String) {
+        if (!tornDown.compareAndSet(false, true)) return
+        session.incrementAndGet()
         runCatching { (application as PasswallApp).engine.stop() }
         runCatching { tun?.close() }
         tun = null
-        ProxyRuntime.markStopped()
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 24) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        }
+        ProxyRuntime.markStopped(message.ifBlank { "已停止" })
+        stopSelf()
+    }
+
+    override fun onDestroy() {
+        tearDown("已停止")
         scope.cancel()
         super.onDestroy()
     }
 
     override fun onRevoke() {
-        stopSelf()
+        tearDown("系统已撤销 VPN")
         super.onRevoke()
     }
 
@@ -163,7 +209,7 @@ class ProxyVpnService : VpnService() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.vpn_notification_title))
-            .setContentText(getString(R.string.proxy_ok))
+            .setContentText(getString(R.string.vpn_notification_title))
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setContentIntent(launch)
             .setOngoing(true)
@@ -171,8 +217,24 @@ class ProxyVpnService : VpnService() {
     }
 
     companion object {
+        const val ACTION_STOP = "com.passwall.tv.vpn.STOP"
         private const val CHANNEL_ID = "passwall_vpn"
         private const val NOTIFICATION_ID = 41
+
+        fun requestStop(context: Context) {
+            val appCtx = context.applicationContext
+            val stop = Intent(appCtx, ProxyVpnService::class.java).setAction(ACTION_STOP)
+            try {
+                appCtx.startService(stop)
+            } catch (t: Throwable) {
+                RuntimeLog.warn("无法向 VpnService 发送停止：${t.message}", "vpn")
+            }
+            try {
+                appCtx.stopService(Intent(appCtx, ProxyVpnService::class.java))
+            } catch (t: Throwable) {
+                RuntimeLog.warn("stopService 失败：${t.message}", "vpn")
+            }
+        }
 
         internal fun isGeodataFailure(t: Throwable): Boolean {
             val msg = (t.message ?: "") + (t.cause?.message ?: "")

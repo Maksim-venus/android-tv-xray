@@ -24,6 +24,18 @@ class ShareLinkParserTest {
     }
 
     @Test
+    fun parseVlessPcsAndVcn() {
+        val pin = "e8e2d387fdbffeb38e9c9065cf30a97ee23c0e3d32ee6f78ffae40966befccc9"
+        val link = "vless://11111111-1111-1111-1111-111111111111@1.2.3.4:443" +
+            "?encryption=none&security=tls&sni=www.example.com&type=tcp" +
+            "&allowInsecure=1&pcs=$pin&vcn=www.example.com#pcs"
+        val node = VlessParser.parse(link)
+        assertEquals(true, node.allowInsecure)
+        assertEquals(pin, node.pinnedPeerCertSha256)
+        assertEquals("www.example.com", node.verifyPeerCertByName)
+    }
+
+    @Test
     fun parseVmessJson() {
         val json = """{"v":"2","ps":"香港-2","add":"hk-2.example.com","port":"443","id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","aid":"0","net":"ws","type":"none","host":"hk-2.example.com","path":"/v","tls":"tls"}"""
         val encoded = Base64.getEncoder().encodeToString(json.toByteArray())

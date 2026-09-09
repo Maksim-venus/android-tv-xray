@@ -47,7 +47,31 @@ class PasswallApp : Application() {
                 statusMessage = { ProxyRuntime.statusMessage.value },
                 usingStub = { engine.status.value.usingStub },
                 startProxy = { ProxyRuntime.requestStartFromApp() },
-                stopProxy = { ProxyRuntime.requestStopFromApp(this) },
+                stopProxy = { ProxyRuntime.stopFromUserAction(this) },
+                probeProxy = {
+                    val result = if (!ProxyRuntime.isRunning.value) {
+                        com.passwall.corexray.ReachabilityResult(
+                            ok = false,
+                            error = "代理未运行",
+                            message = "请先启动代理后再测外网",
+                        )
+                    } else {
+                        com.passwall.corexray.ProxyReachability.probe()
+                    }
+                    if (result.ok) {
+                        ProxyRuntime.markTest(true, result.message)
+                    } else {
+                        ProxyRuntime.markTest(false, result.message)
+                    }
+                    com.passwall.adminweb.ProxyProbeResult(
+                        ok = result.ok,
+                        latencyMs = result.latencyMs,
+                        httpStatus = result.httpStatus,
+                        url = result.url,
+                        error = result.error,
+                        message = result.message,
+                    )
+                },
             ),
         )
         RuntimeLog.info("Passwall 已启动", "app")
