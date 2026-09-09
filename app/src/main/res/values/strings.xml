@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Passwall</string>
+    <string name="start">启动</string>
+    <string name="stop">停止</string>
+    <string name="settings">设置</string>
+    <string name="test">测试</string>
+    <string name="proxy_ok">代理正常</string>
+    <string name="proxy_fail">代理异常</string>
+    <string name="node_list">节点列表</string>
+    <string name="online">在线</string>
+    <string name="allow_insecure">允许不安全 SSL</string>
+    <string name="enable_http_edit">开启 HTTP 编辑</string>
+    <string name="http_edit_on">HTTP 编辑已开启</string>
+    <string name="http_edit_off">HTTP 编辑未开启。打开后可在同一局域网用浏览器管理节点。</string>
+    <string name="vpn_notification_channel">Passwall 代理</string>
+    <string name="vpn_notification_title">Passwall 正在运行</string>
+    <string name="no_node">请先在设置中选择节点</string>
+</resources>

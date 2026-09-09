@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Passwall</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="settings">Settings</string>
+    <string name="test">Test</string>
+    <string name="proxy_ok">Proxy OK</string>
+    <string name="proxy_fail">Proxy error</string>
+    <string name="node_list">Node list</string>
+    <string name="online">Online</string>
+    <string name="allow_insecure">Allow insecure SSL</string>
+    <string name="enable_http_edit">Enable HTTP edit</string>
+    <string name="http_edit_on">HTTP editing enabled</string>
+    <string name="http_edit_off">HTTP editing is off. Enable it to manage nodes from a browser on the LAN.</string>
+    <string name="vpn_notification_channel">Passwall proxy</string>
+    <string name="vpn_notification_title">Passwall is running</string>
+    <string name="no_node">Select a node in Settings first</string>
+</resources>

@@ -1,0 +1,4 @@
+-keep class com.passwall.** { *; }
+-dontwarn org.slf4j.**
+-dontwarn io.ktor.**
+-dontwarn kotlinx.serialization.**

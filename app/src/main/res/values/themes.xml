@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Passwall" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#070B14</item>
+        <item name="android:colorBackground">#070B14</item>
+        <item name="android:statusBarColor">#070B14</item>
+        <item name="android:navigationBarColor">#070B14</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
