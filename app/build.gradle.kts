@@ -13,8 +13,8 @@ android {
         // Floor for the legacy flavor (Android 7.1). Modern overrides this to 31.
         minSdk = 25
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.1.7"
+        versionCode = 9
+        versionName = "0.1.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

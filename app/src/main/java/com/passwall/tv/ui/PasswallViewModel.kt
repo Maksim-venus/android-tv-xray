@@ -10,6 +10,7 @@ import com.passwall.data.model.AppSettings
 import com.passwall.data.model.ProxyNode
 import com.passwall.tv.PasswallApp
 import com.passwall.tv.vpn.ProxyRuntime
+import com.passwall.tv.vpn.VpnPersist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -79,7 +80,10 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun selectNode(id: Long) {
-        viewModelScope.launch { app.repository.selectNode(id) }
+        viewModelScope.launch {
+            app.repository.selectNode(id)
+            VpnPersist.setNodeId(app, id)
+        }
     }
 
     fun setAllowInsecure(enabled: Boolean) {

@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/dist"
-VERSION="${1:-0.1.7}"
+VERSION="${1:-0.1.8}"
 mkdir -p "$DEST"
 if [[ -f "$ROOT/INSTALL.txt" ]]; then
   cp -f "$ROOT/INSTALL.txt" "$DEST/INSTALL.txt"

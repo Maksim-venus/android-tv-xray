@@ -16,6 +16,7 @@ data class StatusDto(
     val xrayCore: String = "26.1.13 / v1.260113.0",
     val message: String = "",
     val routingAssetsUpdatedAt: Long? = null,
+    val routingAssetsLastError: String? = null,
     val lastError: String? = null,
     val lastErrorAt: Long? = null,
 )
@@ -86,6 +87,13 @@ data class ErrorDto(val error: String)
 
 @Serializable
 data class OkDto(val ok: Boolean = true, val id: Long? = null)
+
+@Serializable
+data class RoutingRefreshDto(
+    val success: Boolean,
+    val message: String,
+    val updatedAt: Long? = null,
+)
 
 @Serializable
 data class ProbeDto(

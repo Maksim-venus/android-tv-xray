@@ -3,10 +3,12 @@ package com.passwall.tv
 import android.app.Application
 import com.passwall.adminweb.AdminRuntime
 import com.passwall.adminweb.AdminServer
+import com.passwall.adminweb.AssetRefreshOutcome
 import com.passwall.corexray.Libv2rayEngine
 import com.passwall.corexray.RoutingAssetStore
 import com.passwall.corexray.RoutingAssetUpdater
 import com.passwall.corexray.XrayEngine
+import com.passwall.corexray.XrayPorts
 import com.passwall.data.db.AppDatabase
 import com.passwall.data.log.RuntimeLog
 import com.passwall.data.repo.PasswallRepository
@@ -39,7 +41,17 @@ class PasswallApp : Application() {
         repository = PasswallRepository(db)
         routingAssets = RoutingAssetStore(this)
         routingAssets.installBundledDefaults()
-        assetUpdater = RoutingAssetUpdater(routingAssets, repository)
+        assetUpdater = RoutingAssetUpdater(
+            store = routingAssets,
+            repository = repository,
+            socksPort = {
+                if (this::engine.isInitialized && engine.isRunning()) {
+                    XrayPorts.DEFAULT_SOCKS_PORT
+                } else {
+                    null
+                }
+            },
+        )
         engine = Libv2rayEngine()
         adminServer = AdminServer(
             context = this,
@@ -50,6 +62,21 @@ class PasswallApp : Application() {
                 usingStub = { engine.status.value.usingStub },
                 startProxy = { ProxyRuntime.requestStartFromApp() },
                 stopProxy = { ProxyRuntime.stopFromUserAction(this) },
+                refreshRoutingAssets = {
+                    val result = assetUpdater.refreshAfterSuccessfulStart(force = true)
+                    val updatedAt = repository.getSettings().routingAssetsUpdatedAt
+                    val message = when {
+                        result.success && result.attempted ->
+                            "分流规则已更新：${result.updatedFiles.joinToString()}"
+                        result.attempted -> result.error ?: "分流规则更新失败，继续使用 APK 内置"
+                        else -> result.error ?: "分流规则更新未执行"
+                    }
+                    AssetRefreshOutcome(
+                        success = result.success && result.attempted,
+                        message = message,
+                        updatedAt = updatedAt,
+                    )
+                },
                 probeProxy = {
                     val result = if (!ProxyRuntime.isRunning.value) {
                         com.passwall.corexray.ReachabilityResult(

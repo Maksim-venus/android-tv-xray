@@ -50,6 +50,8 @@ class PasswallRepository(
         return (selectedId?.let { nodes.getById(it) } ?: nodes.getAll().firstOrNull())?.toModel()
     }
 
+    suspend fun findNode(id: Long): ProxyNode? = nodes.getById(id)?.toModel()
+
     suspend fun selectNode(id: Long) {
         val current = settings.get() ?: SettingsEntity()
         settings.upsert(current.copy(selectedNodeId = id))
@@ -67,12 +69,23 @@ class PasswallRepository(
 
     suspend fun setRoutingAssetsUpdatedAt(epochMs: Long) {
         val current = settings.get() ?: SettingsEntity()
-        settings.upsert(current.copy(routingAssetsUpdatedAt = epochMs, routingAssetsAttemptedAt = epochMs))
+        settings.upsert(
+            current.copy(
+                routingAssetsUpdatedAt = epochMs,
+                routingAssetsAttemptedAt = epochMs,
+                routingAssetsLastError = null,
+            ),
+        )
     }
 
     suspend fun setRoutingAssetsAttemptedAt(epochMs: Long) {
         val current = settings.get() ?: SettingsEntity()
         settings.upsert(current.copy(routingAssetsAttemptedAt = epochMs))
+    }
+
+    suspend fun setRoutingAssetsLastError(message: String) {
+        val current = settings.get() ?: SettingsEntity()
+        settings.upsert(current.copy(routingAssetsLastError = message.take(220)))
     }
 
     suspend fun importLinks(text: String): ParseResult {

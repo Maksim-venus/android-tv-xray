@@ -31,6 +31,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicReference
 
@@ -92,6 +93,7 @@ class AdminServer(
                                 lanUrl = LanAddress.httpUrl(settings.httpPort),
                                 message = runtime.statusMessage(),
                                 routingAssetsUpdatedAt = settings.routingAssetsUpdatedAt,
+                                routingAssetsLastError = settings.routingAssetsLastError,
                                 lastError = err?.message,
                                 lastErrorAt = err?.at,
                             ),
@@ -221,6 +223,17 @@ class AdminServer(
                         RuntimeLog.info("网页请求停止代理", "admin")
                         runtime.stopProxy()
                         call.respond(OkDto())
+                    }
+                    post("/routing-assets/refresh") {
+                        RuntimeLog.info("网页请求立即更新分流规则", "geo")
+                        val outcome = withContext(Dispatchers.IO) { runtime.refreshRoutingAssets() }
+                        call.respond(
+                            RoutingRefreshDto(
+                                success = outcome.success,
+                                message = outcome.message,
+                                updatedAt = outcome.updatedAt,
+                            ),
+                        )
                     }
                     post("/proxy/probe") {
                         RuntimeLog.info("网页请求外网探测（经本地 SOCKS / Xray）", "test")

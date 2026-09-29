@@ -1,16 +1,16 @@
-Passwall TV 0.1.7 — install notes
+Passwall TV 0.1.8 — install notes
 ================================
 
 Pick one APK:
 
   Android 7.1+ (API 25) / old box / Linux kernel 4.x / 32-bit
-    Passwall-TV-legacy-0.1.7.apk
+    Passwall-TV-legacy-0.1.8.apk
     package: com.passwall.tv.legacy
     minSdk: 25
     ABIs: armeabi-v7a + arm64-v8a
 
   Android 12+ (API 31) 64-bit TV
-    Passwall-TV-modern-0.1.7.apk
+    Passwall-TV-modern-0.1.8.apk
     package: com.passwall.tv
     minSdk: 31
     ABI: arm64-v8a
@@ -20,7 +20,7 @@ If you are not sure, install legacy. The two packages can be installed together.
 Sideload (USB file manager or adb):
 
   adb connect <tv-ip>:5555
-  adb install -r Passwall-TV-legacy-0.1.7.apk
+  adb install -r Passwall-TV-legacy-0.1.8.apk
 
 Fresh install has no built-in nodes. On the TV: Settings → enable insecure SSL if needed → enable HTTP edit → open the shown http://192.168.x.x:8787 URL from a phone on the same LAN → import vless:// or vmess:// → select the node → 启动 → accept the system VPN dialog.
 
@@ -32,3 +32,31 @@ Android 7.1 (API 25) caveats for the legacy APK:
   - Foreground-service types and notification channels in the manifest apply on newer Android only. API 25 starts the VPN with startService + startForeground and does not create a notification channel.
   - Flag emoji in the connectivity test may show as two letters. The exit IP still comes from ipinfo.io.
   - This build still embeds AndroidLibXrayLite v26.1.13 (real libv2ray / libgojni.so, allowInsecure + TUN startLoop). It is not a stub core.
+
+Auto-reconnect (0.1.8), including 当贝 / Dangbei boxes that kill background apps:
+
+  - After the tunnel comes up, Passwall stores "VPN should be on" and the selected node id.
+  - Pressing 停止 clears that flag. A deliberate Stop does not auto-restart.
+  - If the process is killed while the flag is set, VpnService returns START_STICKY
+    (on API 25 the system recreates the service with a null intent) and a ~15s
+    watchdog alarm starts the process if the ROM ignores sticky services.
+  - Boot, quick-boot, and app update also restore when the flag is still set.
+  - Many Dangbei ROMs drop the VPN consent when they kill the app. The system
+    then shows the VPN permission dialog again. The app cannot accept it silently:
+    you get a Chinese toast and, when the screen can show it, the system dialog.
+    Open Passwall and tap 允许 if the tunnel does not return.
+  - If the box has 自启动, 后台运行, or a battery whitelist, add Passwall.
+    Legacy package name: com.passwall.tv.legacy.
+  - A force-stop from system settings cancels alarms until you open the app once.
+    Opening it tries to restore.
+  - Failed starts back off (2s, 5s, 15s, 30s, 60s, 120s) and stop after 6 failures.
+    The reason is written to the web admin 日志. A kill after a healthy start
+    does not consume those retries.
+  - If the app process stays alive but the Xray core stops (startLoop/core exit,
+    or 127.0.0.1:10808 stops accepting), Passwall restarts that core on the same
+    TUN and node. That path has its own 6-try cap and Chinese web-admin logs.
+    Pressing 停止 cancels it. A core that stays up for about a minute clears the count.
+  - After a successful start, if geoip/geosite were never updated or are older than
+    7 days, Passwall downloads them (mainland mirrors first; GitHub last). The web
+    admin 系统 page shows the last success time, or a Chinese failure reason instead
+    of staying on 「尚未更新」. 「立即更新」 retries without waiting.

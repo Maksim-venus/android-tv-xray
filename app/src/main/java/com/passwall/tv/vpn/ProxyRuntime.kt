@@ -35,6 +35,27 @@ object ProxyRuntime {
 
     var pendingStart: Boolean = false
 
+    /**
+     * True while at least one VpnService instance has accepted a start and not yet destroyed.
+     * Counted so an older instance's onDestroy cannot clear the flag after a restart already began.
+     */
+    @Volatile
+    var serviceAcceptedStart: Boolean = false
+
+    private val acceptedServices = AtomicInteger(0)
+
+    fun noteServiceStarted() {
+        acceptedServices.incrementAndGet()
+        serviceAcceptedStart = true
+    }
+
+    fun noteServiceStopped() {
+        if (acceptedServices.decrementAndGet() <= 0) {
+            acceptedServices.set(0)
+            serviceAcceptedStart = false
+        }
+    }
+
     private val stopInFlight = AtomicBoolean(false)
     private val hintGeneration = AtomicInteger(0)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -128,6 +149,10 @@ object ProxyRuntime {
      * Xray immediately, then asks VpnService to close TUN. Never a silent no-op.
      */
     fun stopFromUserAction(context: Context) {
+        val wasWanted =         VpnPersist.clearWanted(context)
+        VpnWatchdog.cancel(context)
+        VpnRestarter.onServiceSettled()
+        if (wasWanted) RuntimeLog.info("用户停止，不再自动重连", "vpn")
         val app = context.applicationContext as? PasswallApp
         val engineRunning = app?.engine?.isRunning() == true
         if (stopInFlight.get() || _isStopping.value) {
@@ -176,20 +201,29 @@ object ProxyRuntime {
         stopFromUserAction(context)
     }
 
-    fun startService(context: Context) {
-        try {
-            val intent = android.content.Intent(context, ProxyVpnService::class.java)
+    fun startService(context: Context, restore: Boolean = false): Boolean {
+        return try {
+            val intent = android.content.Intent(context, ProxyVpnService::class.java).setAction(
+                if (restore) ProxyVpnService.ACTION_RESTORE else ProxyVpnService.ACTION_START,
+            )
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
                 context.startService(intent)
             }
-            RuntimeLog.info("正在启动 VpnService", "vpn")
-            markMessage("正在启动代理…")
+            if (restore) {
+                RuntimeLog.info("正在自动重连 VpnService", "vpn")
+                markMessage("正在自动重连…")
+            } else {
+                RuntimeLog.info("正在启动 VpnService", "vpn")
+                markMessage("正在启动代理…")
+            }
+            true
         } catch (t: Throwable) {
             val msg = "无法启动服务：${t.message ?: t.javaClass.simpleName}"
             markError(msg)
             toast(context, msg)
+            false
         }
     }
 

@@ -16,7 +16,7 @@ v26.1.13 is the last well-verified published AAR that:
 1. `VpnService` creates a TUN (`10.0.85.2/32`, default route, DNS 8.8.8.8 + 223.5.5.5).
 2. The app package is `addDisallowedApplication` so Xray’s own sockets do not loop into the TUN.
 3. `Libv2ray.initCoreEnv(filesDir/xray, "")` so `geoip.dat` / `geosite.dat` resolve.
-4. `CoreController.startLoop(json, tun.fd)` sets process env `xray.tun.fd`. The same fd is also written into the JSON root `env` object. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`.
+4. `CoreController.startLoop(json, tun.fd)` sets process env `xray.tun.fd`. The same fd is also written into the JSON root `env` object. The JSON has a `tun` inbound (gVisor) plus a local socks inbound on `127.0.0.1:10808`. v26.1.13 returns from `StartLoop` after `core.Start()` and does not call `shutdown()` from `StopLoop`. The service watches `IsRunning`, those callbacks, and whether `127.0.0.1:10808` still accepts. If the core dies while the VPN is still wanted, `startLoop` is started again on the same TUN fd.
 5. Routing: `geosite:cn` / `geoip:cn` / `geoip:private` → freedom; else → selected VLESS/VMess outbound.
 6. 「测试」sends HTTPS GET to `https://ipinfo.io/json` via the local SOCKS inbound (`127.0.0.1:10808`) so the request goes through Xray routing → the selected outbound. The UI shows the exit IP and a country-flag emoji. `generate_204` is used only if ipinfo fails. `measureDelay` is optional extra “链路” timing only. TV status / Toast clear after 5 seconds.
 7. TLS: when 「允许不安全 SSL」 is on, emit `allowInsecure: true`. Do not emit `verifyPeerCertByName` (this core uses `verifyPeerCertInNames`). Optional `pinnedPeerCertSha256` is accepted if the share link has `pcs`.
