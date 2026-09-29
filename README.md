@@ -87,7 +87,7 @@ Pinned core **Xray v1.260113.0** still honors `tlsSettings.allowInsecure`. Offic
 - VpnService TUN fd is passed to `CoreController.startLoop(config, tunFd)` (`xray.tun.fd`). Config uses a **tun** inbound (gVisor) — not a drain stub.
 - ChinaDNS-style split: `geosite:cn` / `geoip:cn` / private → direct; else → VLESS/VMess.
 - TLS: when the insecure toggle is on, emit `allowInsecure: true`. Do not emit `verifyPeerCertByName` (this core uses `verifyPeerCertInNames`). Optional `pcs` → `pinnedPeerCertSha256`.
-- Bundled **official Loyalsoldier** `geosite.dat` (must contain `cn`; compact generate-geosite.py is banned) plus `geoip-only-cn-private`. Invalid runtime files are replaced. If Xray still rejects geosite, start retries with IP-only `geoip:cn` rules. 7-day refresh after a successful start.
+- Bundled **official Loyalsoldier** `geosite.dat` (must contain `cn`; compact generate-geosite.py is banned) plus `geoip-only-cn-private`. Invalid runtime files are replaced. If Xray still rejects geosite, start retries with IP-only `geoip:cn` rules. After a successful start, refresh those files when they are older than 7 days (or never updated). The web admin shows the last success time, or the Chinese failure reason, and has 「立即更新」.
 - Local Passwall-like web admin when HTTP edit is on. Sidebar **日志** shows VPN/Xray ring-buffer lines (`GET /api/logs`), auto-refresh, error filter, clear; entries older than **7 days** are pruned on write and hourly. **外网探测** is `POST /api/proxy/probe` (ipinfo.io via SOCKS; returns `exitIp` / `country` / `flag`). Latest start failure is shown on the admin status panel.
 - Licenses: [THIRD_PARTY.md](THIRD_PARTY.md). Native notes: [docs/NATIVE_XRAY.md](docs/NATIVE_XRAY.md).
 
@@ -124,7 +124,7 @@ SSR is recognized only (no outbound). Subscription **HTTP fetch** is still a stu
 
 ### Routing asset update
 
-After every successful start, if Room `routingAssetsUpdatedAt` is missing or older than 7 days, download Loyalsoldier `geoip.dat` / `geosite.dat` / `direct-list.txt` (jsDelivr → Fastly → GitHub). Keep last-good on failure. URLs: `core-xray/src/main/assets/xray/SOURCES.txt`.
+After every successful start, if Room `routingAssetsUpdatedAt` is missing or older than 7 days, download Loyalsoldier `geoip-only-cn-private.dat` (saved as `geoip.dat`), `geosite.dat`, and `direct-list.txt`. Mirrors start with `cdn.jsdmirror.com` / `jsd.onmicrosoft.cn` because the app is excluded from its own VPN and GitHub often fails in mainland China. A failed download keeps the bundled files, stores the Chinese reason, and the web admin shows it instead of staying on 「尚未更新」. 「立即更新」 retries immediately. URLs: `core-xray/src/main/assets/xray/SOURCES.txt`.
 
 ### Build
 

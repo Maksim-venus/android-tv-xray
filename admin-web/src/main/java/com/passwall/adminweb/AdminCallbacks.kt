@@ -4,6 +4,12 @@ fun interface ProxyController {
     fun setRunning(running: Boolean)
 }
 
+data class AssetRefreshOutcome(
+    val success: Boolean,
+    val message: String,
+    val updatedAt: Long? = null,
+)
+
 data class AdminRuntime(
     val isRunning: () -> Boolean,
     val statusMessage: () -> String,
@@ -11,6 +17,9 @@ data class AdminRuntime(
     val startProxy: () -> Unit,
     val stopProxy: () -> Unit,
     val probeProxy: () -> ProxyProbeResult = { ProxyProbeResult(false, message = "探测未接线") },
+    val refreshRoutingAssets: suspend () -> AssetRefreshOutcome = {
+        AssetRefreshOutcome(success = false, message = "未接线")
+    },
 )
 
 data class ProxyProbeResult(

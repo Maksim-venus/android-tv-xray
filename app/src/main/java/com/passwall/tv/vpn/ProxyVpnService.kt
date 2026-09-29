@@ -252,7 +252,9 @@ class ProxyVpnService : VpnService() {
             scope.launch {
                 val geo = runCatching { app.assetUpdater.refreshAfterSuccessfulStart() }
                     .getOrElse {
-                        RuntimeLog.warn("分流规则更新异常：${it.message}", "geo")
+                        val message = it.message ?: it.javaClass.simpleName
+                        RuntimeLog.warn("分流规则更新异常：$message", "geo")
+                        runCatching { app.repository.setRoutingAssetsLastError("更新异常：$message") }
                         return@launch
                     }
                 when {

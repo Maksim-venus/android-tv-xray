@@ -7,6 +7,7 @@ data class AppSettings(
     val httpPort: Int = DEFAULT_HTTP_PORT,
     val routingAssetsUpdatedAt: Long? = null,
     val routingAssetsAttemptedAt: Long? = null,
+    val routingAssetsLastError: String? = null,
 ) {
     companion object {
         const val DEFAULT_HTTP_PORT = 8787

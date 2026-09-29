@@ -86,9 +86,7 @@ function render() {
   $("optInsecure").checked = !!state.status?.allowInsecureSsl;
   $("optHttp").checked = !!state.status?.httpEditEnabled;
   $("sysUrl").textContent = state.status?.lanUrl || "—";
-  $("sysGeo").textContent = state.status?.routingAssetsUpdatedAt
-    ? new Date(state.status.routingAssetsUpdatedAt).toLocaleString()
-    : "尚未更新（使用 APK 内置）";
+  $("sysGeo").textContent = geoStatusText(state.status);
   if (state.lastProbe) showLastProbe(state.lastProbe);
   const err = state.status?.lastError;
   const showErr = !running && !!err;
@@ -299,6 +297,17 @@ $("btnTcpPing").onclick = async () => {
   } catch (e) { toast(state.demo ? "预览模式无法 TCP Ping" : e.message); }
 };
 
+function geoStatusText(status) {
+  if (!status) return "尚未更新（使用 APK 内置）";
+  const err = status.routingAssetsLastError;
+  if (status.routingAssetsUpdatedAt) {
+    const when = new Date(status.routingAssetsUpdatedAt).toLocaleString();
+    return err ? `${when}（仍用该版本，上次失败：${err}）` : when;
+  }
+  if (err) return `更新失败，使用 APK 内置：${err}`;
+  return "尚未更新（使用 APK 内置）";
+}
+
 function formatProbe(r) {
   if (r?.message) return r.message;
   if (r?.ok && r.exitIp) return `${r.flag || "🌐"} 出口 ${r.exitIp}`;
@@ -323,6 +332,23 @@ async function runOutboundProbe() {
 }
 if ($("btnProbe")) $("btnProbe").onclick = runOutboundProbe;
 $("btnSysProbe")?.addEventListener("click", runOutboundProbe);
+
+$("btnGeo")?.addEventListener("click", async () => {
+  const btn = $("btnGeo");
+  if (state.demo) return toast("预览模式无法更新分流规则");
+  if (btn) btn.disabled = true;
+  $("sysGeo").textContent = "正在更新分流规则…";
+  try {
+    const r = await api("/api/routing-assets/refresh", { method: "POST", body: "{}" });
+    toast(r.message || (r.success ? "分流规则已更新" : "更新失败"));
+    await loadAll();
+  } catch (e) {
+    toast(e.message);
+    await loadAll();
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
 
 $("nodeBody").onclick = async (ev) => {
   const btn = ev.target.closest("button[data-act]");

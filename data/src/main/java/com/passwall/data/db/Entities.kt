@@ -126,6 +126,7 @@ data class SettingsEntity(
     val httpPort: Int = AppSettings.DEFAULT_HTTP_PORT,
     val routingAssetsUpdatedAt: Long? = null,
     val routingAssetsAttemptedAt: Long? = null,
+    val routingAssetsLastError: String? = null,
 ) {
     fun toModel(): AppSettings = AppSettings(
         selectedNodeId = selectedNodeId,
@@ -134,5 +135,6 @@ data class SettingsEntity(
         httpPort = httpPort,
         routingAssetsUpdatedAt = routingAssetsUpdatedAt,
         routingAssetsAttemptedAt = routingAssetsAttemptedAt,
+        routingAssetsLastError = routingAssetsLastError,
     )
 }

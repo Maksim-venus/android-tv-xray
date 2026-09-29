@@ -26,8 +26,16 @@ If geosite.dat still fails Xray load at runtime, the VPN start path
 retries with IP-only rules (geoip:cn / cn-cidr) and writes a Chinese
 error to the in-app log.
 
-7-day remote refresh (after a successful proxy start):
+7-day remote refresh (after a successful proxy start, or 「立即更新」):
 
-  geoip.dat / geosite.dat / direct-list.txt
-    jsDelivr → Fastly → GitHub (Loyalsoldier/v2ray-rules-dat).
-    geosite downloads smaller than 100KB are rejected.
+  geoip.dat
+    Loyalsoldier geoip-only-cn-private.dat (~140KB), saved as geoip.dat.
+  geosite.dat / direct-list.txt
+    Loyalsoldier/v2ray-rules-dat.
+  Mirror order (app traffic is outside the TUN, so GitHub often fails in CN):
+    cdn.jsdmirror.com → jsd.onmicrosoft.cn → gcore → testingcf
+    → cdn.jsdelivr.net → fastly → ghfast.top → GitHub releases.
+  If those fail while Xray is up, retry once via 127.0.0.1:10808.
+  geoip + geosite must both succeed before routingAssetsUpdatedAt is saved.
+  Failures are stored in routingAssetsLastError and shown in the web admin.
+  geosite downloads smaller than 100KB are rejected.
