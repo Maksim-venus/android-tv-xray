@@ -27,31 +27,82 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 class ProxyVpnService : VpnService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var scope = newScope()
     private var tun: ParcelFileDescriptor? = null
     private val tornDown = AtomicBoolean(false)
+    private val explicitStop = AtomicBoolean(false)
     private val session = AtomicInteger(0)
+    private var acceptedStart = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            explicitStop.set(true)
+            VpnPersist.clearWanted(this)
+            VpnWatchdog.cancel(this)
             tearDown("已停止")
             return START_NOT_STICKY
         }
+        val userStart = intent?.action == ACTION_START
+        if (!userStart && intent == null) {
+            RuntimeLog.warn("系统重新拉起 VpnService（START_STICKY flags=$flags）", "vpn")
+        }
+        if (!userStart && !VpnPersist.isWanted(this)) {
+            return stopWithoutRestart("已停止")
+        }
+        if (!userStart && VpnPersist.isExhausted(this)) {
+            return stopWithoutRestart("自动重连已停止")
+        }
+        // A second sticky/watchdog start must not tear down a tunnel that is already coming up.
+        if (!tornDown.get() && session.get() > 0) {
+            RuntimeLog.info("VpnService 已在运行，忽略重复拉起", "vpn")
+            VpnWatchdog.scheduleHealthy(this)
+            return START_STICKY
+        }
+        val gate = VpnPersist.beginAttempt(this, userStart = userStart)
+        if (gate != AttemptGate.PROCEED || (!userStart && !VpnPersist.isWanted(this))) {
+            return stopWithoutRestart(if (gate == AttemptGate.EXHAUSTED) "自动重连已停止" else "已停止")
+        }
+        explicitStop.set(false)
         tornDown.set(false)
+        acceptedStart = true
+        ProxyRuntime.noteServiceStarted()
         val mySession = session.incrementAndGet()
-        startForeground(NOTIFICATION_ID, buildNotification())
-        scope.launch { startProxy(mySession) }
+        runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
+            .onFailure { RuntimeLog.warn("前台通知失败：${it.message}", "vpn") }
+        VpnWatchdog.scheduleHealthy(this)
+        liveScope().launch { startProxy(mySession) }
+        // API 25: the process killer does not deliver a new Intent. START_STICKY asks the
+        // system to recreate this service with a null intent. The alarm is the backup.
+        return START_STICKY
+    }
+
+    private fun stopWithoutRestart(message: String): Int {
+        explicitStop.set(true)
+        VpnWatchdog.cancel(this)
+        runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
+        tearDown(message)
         return START_NOT_STICKY
     }
 
+    private fun liveScope(): CoroutineScope {
+        if (!scope.isActive) scope = newScope()
+        return scope
+    }
+
     private suspend fun startProxy(mySession: Int) {
-        val app = application as PasswallApp
-        val node = app.repository.getSelectedNode()
-        if (node == null) {
-            ProxyRuntime.markError(getString(R.string.no_node))
-            tearDown("请先在设置或网页导入节点")
+        // An older session must not call tearDown: that would clear tornDown on the new session.
+        if (abandoned(mySession)) return
+        if (!VpnPersist.isWanted(this)) {
+            tearDown("已停止")
             return
         }
+        val app = application as PasswallApp
+        val node = resolveNode(app)
+        if (node == null) {
+            failStart(mySession, getString(R.string.no_node), retryable = false)
+            return
+        }
+        RuntimeLog.info("VPN 节点：${node.name}", "vpn")
         val settings = app.repository.getSettings()
         app.routingAssets.installBundledDefaults()
         var health = app.routingAssets.health()
@@ -73,6 +124,14 @@ class ProxyVpnService : VpnService() {
         val configFile = app.routingAssets.configFile()
         try {
             if (abandoned(mySession)) return
+            val prepare = VpnService.prepare(this)
+            if (prepare != null) {
+                if (abandoned(mySession)) return
+                ProxyRuntime.markError("需要重新允许 VPN")
+                VpnRestarter.onConsentNeeded(this, prepare, consentLauncher = null)
+                tearDown("需要重新允许 VPN")
+                return
+            }
             val builder = Builder()
                 .setSession("Passwall")
                 .addAddress("10.0.85.2", 32)
@@ -93,8 +152,7 @@ class ProxyVpnService : VpnService() {
             tun?.close()
             tun = builder.establish()
             if (tun == null) {
-                ProxyRuntime.markError("系统未能建立 VPN 通道（TUN 为空）")
-                tearDown("系统未能建立 VPN 通道（TUN 为空）")
+                failStart(mySession, "系统未能建立 VPN 通道（TUN 为空）", retryable = true)
                 return
             }
             if (abandoned(mySession)) {
@@ -135,11 +193,15 @@ class ProxyVpnService : VpnService() {
                     throw t
                 }
             }
-            if (abandoned(mySession)) {
+            if (abandoned(mySession) || !VpnPersist.isWanted(this)) {
                 runCatching { app.engine.stop() }
                 return
             }
+            VpnPersist.ackRunning(this, node.id)
+            VpnWatchdog.scheduleHealthy(this)
+            RuntimeLog.info("已记住自动重连，节点 ${node.name}", "vpn")
             ProxyRuntime.markStarted("已启动，请点测试检查外网")
+            VpnRestarter.onServiceSettled()
             // Never block start: refresh geoip/geosite in the background.
             scope.launch {
                 val geo = runCatching { app.assetUpdater.refreshAfterSuccessfulStart() }
@@ -155,13 +217,48 @@ class ProxyVpnService : VpnService() {
             }
         } catch (t: Throwable) {
             if (abandoned(mySession)) return
-            ProxyRuntime.markError("配置或引擎启动失败：${t.message ?: t.javaClass.simpleName}")
-            tearDown("配置或引擎启动失败")
+            if (t is SecurityException) {
+                val prepare = runCatching { VpnService.prepare(this) }.getOrNull()
+                if (prepare != null) {
+                    ProxyRuntime.markError("需要重新允许 VPN")
+                    VpnRestarter.onConsentNeeded(this, prepare, consentLauncher = null)
+                    tearDown("需要重新允许 VPN")
+                    return
+                }
+            }
+            val detail = t.message ?: t.javaClass.simpleName
+            failStart(mySession, "配置或引擎启动失败：$detail", retryable = true)
         }
     }
 
+    private suspend fun resolveNode(app: PasswallApp): com.passwall.data.model.ProxyNode? {
+        val preferred = VpnPersist.nodeId(this)
+        val persisted = if (preferred > 0) app.repository.findNode(preferred) else null
+        if (persisted != null) {
+            if (app.repository.getSettings().selectedNodeId != persisted.id) {
+                app.repository.selectNode(persisted.id)
+            }
+            return persisted
+        }
+        if (preferred > 0) {
+            RuntimeLog.warn("上次节点已不在列表中，改用当前选中节点", "vpn")
+        }
+        val node = app.repository.getSelectedNode() ?: return null
+        VpnPersist.setNodeId(this, node.id)
+        return node
+    }
+
+    private fun failStart(mySession: Int, message: String, retryable: Boolean) {
+        if (abandoned(mySession)) return
+        ProxyRuntime.markError(message)
+        if (VpnPersist.isWanted(this) && !explicitStop.get()) {
+            VpnRestarter.planRetry(this, message, retryable)
+        }
+        tearDown(message)
+    }
+
     private fun abandoned(mySession: Int): Boolean =
-        tornDown.get() || mySession != session.get() || !scope.isActive
+        explicitStop.get() || tornDown.get() || mySession != session.get() || !scope.isActive
 
     private fun tearDown(message: String) {
         if (!tornDown.compareAndSet(false, true)) return
@@ -182,12 +279,31 @@ class ProxyVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        tearDown("已停止")
+        val explicit = explicitStop.get()
+        if (!tornDown.get()) {
+            tearDown(if (explicit) "已停止" else "服务已结束")
+        }
         scope.cancel()
+        if (acceptedStart) {
+            acceptedStart = false
+            ProxyRuntime.noteServiceStopped()
+        }
+        VpnRestarter.onServiceDestroyed(this, explicit)
         super.onDestroy()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (VpnPersist.isWanted(this) && !explicitStop.get() && !VpnPersist.isExhausted(this)) {
+            VpnWatchdog.scheduleIfSooner(this, VpnRetryPolicy.DESTROY_RESTART_MS, "任务被移除")
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onRevoke() {
+        RuntimeLog.warn("系统已撤销 VPN", "vpn")
+        if (VpnPersist.isWanted(this) && !explicitStop.get()) {
+            VpnPersist.recordHandledFailure(this, System.currentTimeMillis())
+        }
         tearDown("系统已撤销 VPN")
         super.onRevoke()
     }
@@ -220,8 +336,12 @@ class ProxyVpnService : VpnService() {
 
     companion object {
         const val ACTION_STOP = "com.passwall.tv.vpn.STOP"
+        const val ACTION_START = "com.passwall.tv.vpn.START"
+        const val ACTION_RESTORE = "com.passwall.tv.vpn.RESTORE"
         private const val CHANNEL_ID = "passwall_vpn"
         private const val NOTIFICATION_ID = 41
+
+        private fun newScope() = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         fun requestStop(context: Context) {
             val appCtx = context.applicationContext

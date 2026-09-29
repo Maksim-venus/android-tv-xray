@@ -50,6 +50,8 @@ class PasswallRepository(
         return (selectedId?.let { nodes.getById(it) } ?: nodes.getAll().firstOrNull())?.toModel()
     }
 
+    suspend fun findNode(id: Long): ProxyNode? = nodes.getById(id)?.toModel()
+
     suspend fun selectNode(id: Long) {
         val current = settings.get() ?: SettingsEntity()
         settings.upsert(current.copy(selectedNodeId = id))

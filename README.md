@@ -12,17 +12,17 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 | 电视 / 盒子 | 选这个文件 |
 | --- | --- |
-| **Android 7.1+（API 25）/ 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.7.apk`（包名 `com.passwall.tv.legacy`） |
-| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.7.apk`（包名 `com.passwall.tv`） |
+| **Android 7.1+（API 25）/ 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.8.apk`（包名 `com.passwall.tv.legacy`） |
+| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.8.apk`（包名 `com.passwall.tv`） |
 
 不确定就先装 **legacy**。两个可以同时装（包名不同）。
 
 成品路径（本机构建后，可直接拷走安装）：
 
-- `/workspace/dist/Passwall-TV-legacy-0.1.7.apk`
-- `/workspace/dist/Passwall-TV-modern-0.1.7.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.7.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.7.apk`
+- `/workspace/dist/Passwall-TV-legacy-0.1.8.apk`
+- `/workspace/dist/Passwall-TV-modern-0.1.8.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.8.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.8.apk`
 - 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
 - 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
 
@@ -38,9 +38,9 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 ```bash
 adb connect 电视IP:5555
-adb install -r dist/Passwall-TV-legacy-0.1.7.apk
+adb install -r dist/Passwall-TV-legacy-0.1.8.apk
 # 或
-adb install -r dist/Passwall-TV-modern-0.1.7.apk
+adb install -r dist/Passwall-TV-modern-0.1.8.apk
 ```
 
 ### 3. 第一次使用
@@ -55,7 +55,8 @@ adb install -r dist/Passwall-TV-modern-0.1.7.apk
 6. 回到电视，在节点列表里选中刚导入的节点（蓝勾）。
 7. 返回首页，点中间 **启动**，同意系统 VPN 授权。
 8. 运行后点右下角 **测试**：经本地 SOCKS `127.0.0.1:10808` → Xray 出站，查询 `https://ipinfo.io/json` 的**出口 IP** 与国家代码，首页显示如 `🇯🇵 出口 1.2.3.4 · 62 ms`。ipinfo 失败时才回退 `generate_204`。状态栏 / Toast / 成功失败提示约 **5 秒后自动消失**。
-9. 点 **停止** 会立刻停 Xray 并拆掉 TUN；失败会 Toast + 底部中文 + 网页日志，不会静默无反应。
+9. 点 **停止** 会立刻停 Xray 并拆掉 TUN，并取消自动重连；失败会 Toast + 底部中文 + 网页日志，不会静默无反应。
+10. **自动重连**：启动成功后会记住「VPN 要开着」和当前节点。当贝等盒子把进程杀掉之后，服务以 `START_STICKY` 回来，另外大约每 15 秒有一次看门狗。点过「停止」就不会再拉起。杀进程后系统经常要重新点一次 VPN「允许」，这时会出现中文 Toast；应用不能替你点允许。若盒子里有自启动、后台运行或电池白名单，把 Passwall（legacy 包名 `com.passwall.tv.legacy`）加进去。连续启动失败会退避（2 秒起，最多 6 次）并写到网页日志，避免死循环；已经连上之后被杀掉不算进这 6 次。
 
 全新安装**没有预置节点**。未导入时点「启动」会提示「请先在设置或网页导入节点」。
 
@@ -67,10 +68,12 @@ adb install -r dist/Passwall-TV-modern-0.1.7.apk
 
 | Device | APK |
 | --- | --- |
-| Android 7.1+ (API 25) / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.7.apk` |
-| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.7.apk` |
+| Android 7.1+ (API 25) / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.8.apk` |
+| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.8.apk` |
 
 Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an empty node list. Enable HTTP edit on the TV, import `vless://` / `vmess://` from a phone on the same LAN, select the node, press 启动, accept the VPN dialog.
+
+After a successful start the app remembers that the VPN should stay on. If the box kills the process it tries to restore the last node (`START_STICKY` plus a 15s watchdog). **停止** clears that and does not reconnect. Dangbei-class ROMs often show the VPN consent dialog again after a kill — accept it when prompted. If the box has a battery or autostart whitelist, add Passwall (`com.passwall.tv.legacy` for the legacy APK). Startup failures back off and stop after 6 tries; the reason is in the web admin log. A kill after the tunnel is already up does not use up those retries.
 
 **测试** is a real HTTPS GET through the Xray SOCKS inbound (not a TUN-direct request from the app process, and not `measureDelay` alone). Primary target is `ipinfo.io` (exit IP + country flag). `generate_204` is fallback only. TV status / Toast auto-clear after 5 seconds. Web logs keep 7 days.
 
