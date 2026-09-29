@@ -9,7 +9,9 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import com.passwall.corexray.GeneratedConfig
 import com.passwall.corexray.GeodataHealth
 import com.passwall.corexray.XrayConfigGenerator
 import com.passwall.data.log.RuntimeLog
@@ -19,12 +21,19 @@ import com.passwall.tv.PasswallApp
 import com.passwall.tv.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
+import java.io.File
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class ProxyVpnService : VpnService() {
     private var scope = newScope()
@@ -33,6 +42,18 @@ class ProxyVpnService : VpnService() {
     private val explicitStop = AtomicBoolean(false)
     private val session = AtomicInteger(0)
     private var acceptedStart = false
+    private val proxyStartInFlight = AtomicBoolean(false)
+    private val coreWatchArmed = AtomicBoolean(false)
+    private val coreRestartGate = AtomicBoolean(false)
+    private val coreEpoch = AtomicInteger(0)
+    private val coreRestartJob = AtomicReference<Job?>(null)
+    private val coreListenerToken = Any()
+    private var coreWatchJob: Job? = null
+    private var consecutiveSocksFailures = 0
+    private var coreHealthySinceElapsed = 0L
+    private var lastGenerated: GeneratedConfig? = null
+    private var lastConfigFile: File? = null
+    private var lastNodeName: String = ""
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -54,6 +75,17 @@ class ProxyVpnService : VpnService() {
         }
         // A second sticky/watchdog start must not tear down a tunnel that is already coming up.
         if (!tornDown.get() && session.get() > 0) {
+            val engineUp = runCatching { (application as PasswallApp).engine.isRunning() }.getOrDefault(false)
+            if (userStart && !engineUp && !proxyStartInFlight.get()) {
+                RuntimeLog.info("VpnService 仍在，按用户请求重新拉起 Xray", "vpn")
+                explicitStop.set(false)
+                coreEpoch.incrementAndGet()
+                coreRestartJob.getAndSet(null)?.cancel()
+                coreRestartGate.set(false)
+                VpnPersist.prepareUserStart(this, VpnPersist.nodeId(this).takeIf { it > 0 })
+                liveScope().launch { startProxy(session.get()) }
+                return START_STICKY
+            }
             RuntimeLog.info("VpnService 已在运行，忽略重复拉起", "vpn")
             VpnWatchdog.scheduleHealthy(this)
             return START_STICKY
@@ -96,6 +128,16 @@ class ProxyVpnService : VpnService() {
             tearDown("已停止")
             return
         }
+        if (!proxyStartInFlight.compareAndSet(false, true)) return
+        try {
+            startProxyBody(mySession)
+        } finally {
+            proxyStartInFlight.set(false)
+        }
+    }
+
+    private suspend fun startProxyBody(mySession: Int) {
+        coreWatchArmed.set(false)
         val app = application as PasswallApp
         val node = resolveNode(app)
         if (node == null) {
@@ -200,6 +242,10 @@ class ProxyVpnService : VpnService() {
             VpnPersist.ackRunning(this, node.id)
             VpnWatchdog.scheduleHealthy(this)
             RuntimeLog.info("已记住自动重连，节点 ${node.name}", "vpn")
+            lastGenerated = generated
+            lastConfigFile = configFile
+            lastNodeName = node.name
+            armCoreWatch()
             ProxyRuntime.markStarted("已启动，请点测试检查外网")
             VpnRestarter.onServiceSettled()
             // Never block start: refresh geoip/geosite in the background.
@@ -248,6 +294,177 @@ class ProxyVpnService : VpnService() {
         return node
     }
 
+    private fun armCoreWatch() {
+        consecutiveSocksFailures = 0
+        coreHealthySinceElapsed = SystemClock.elapsedRealtime()
+        coreWatchArmed.set(true)
+        (application as PasswallApp).engine.setOnUnexpectedStop(coreListenerToken) {
+            if (!coreWatchArmed.get() || explicitStop.get()) return@setOnUnexpectedStop
+            onCoreDied(session.get(), "startLoop 已退出")
+        }
+        ensureCoreWatch()
+    }
+
+    private fun ensureCoreWatch() {
+        val existing = coreWatchJob
+        if (existing != null && existing.isActive) return
+        coreWatchJob = liveScope().launch {
+            while (isActive) {
+                delay(CoreWatch.INTERVAL_MS)
+                if (!isActive) return@launch
+                val state = VpnPersist.read(this@ProxyVpnService)
+                val engineUp = runCatching { (application as PasswallApp).engine.isRunning() }
+                    .getOrDefault(false)
+                if (engineUp && coreWatchArmed.get() && !coreRestartGate.get()) {
+                    val port = lastGenerated?.socksPort ?: com.passwall.corexray.DEFAULT_SOCKS_PORT
+                    if (socksAccepting(port)) {
+                        consecutiveSocksFailures = 0
+                        noteCoreStable(state)
+                    } else {
+                        consecutiveSocksFailures += 1
+                        RuntimeLog.warn(
+                            "Xray 本地端口无响应（${consecutiveSocksFailures}/${CoreWatch.SOCKS_FAILS_BEFORE_RESTART}）",
+                            "xray",
+                        )
+                    }
+                }
+                if (CoreWatch.shouldRestart(
+                        wanted = state.wanted,
+                        explicitStop = explicitStop.get(),
+                        watchArmed = coreWatchArmed.get(),
+                        restartInFlight = coreRestartGate.get(),
+                        engineRunning = engineUp,
+                        consecutiveSocksFailures = consecutiveSocksFailures,
+                        coreExhausted = state.coreExhausted,
+                    )
+                ) {
+                    val reason = if (!engineUp) "核心已停止运行" else "本地 SOCKS 无响应"
+                    onCoreDied(session.get(), reason)
+                }
+            }
+        }
+    }
+
+    private fun noteCoreStable(state: VpnAttemptState) {
+        val now = SystemClock.elapsedRealtime()
+        if (coreHealthySinceElapsed == 0L) coreHealthySinceElapsed = now
+        if (now - coreHealthySinceElapsed < CoreWatch.STABLE_RESET_MS) return
+        if (state.coreFailures > 0 || state.coreExhausted) {
+            VpnPersist.resetCoreFailures(this)
+            RuntimeLog.info("Xray 核心已稳定运行，自动重启计数已清零", "xray")
+        }
+        coreHealthySinceElapsed = now
+    }
+
+    private fun onCoreDied(mySession: Int, reason: String) {
+        if (abandoned(mySession) || explicitStop.get() || !VpnPersist.isWanted(this)) return
+        if (proxyStartInFlight.get()) return
+        if (!coreRestartGate.compareAndSet(false, true)) return
+        coreWatchArmed.set(false)
+        coreHealthySinceElapsed = 0L
+        val (state, counted) = VpnPersist.recordCoreFailure(this, System.currentTimeMillis())
+        if (!counted) {
+            coreRestartGate.set(false)
+            return
+        }
+        if (!VpnAttemptMachine.shouldRestartCore(state, explicitStop.get())) {
+            coreRestartGate.set(false)
+            RuntimeLog.error(
+                "Xray 自动重启已停止：连续 ${state.coreFailures} 次未能拉起核心。请手动点「启动」。",
+                "xray",
+            )
+            ProxyRuntime.markError("Xray 核心反复退出，已停止自动重启")
+            ProxyRuntime.toast(this, "Xray 反复退出，请手动启动")
+            return
+        }
+        val delayMs = VpnRetryPolicy.delayFor(state.coreFailures)
+        val epoch = coreEpoch.get()
+        RuntimeLog.warn(
+            "Xray 核心已退出（$reason），${delayMs / 1000} 秒后用原节点重启（${state.coreFailures}/${VpnRetryPolicy.MAX_FAILURES}）",
+            "xray",
+        )
+        ProxyRuntime.markMessage("Xray 核心已退出，正在自动重启…")
+        val job = liveScope().launch {
+            var followUp: String? = null
+            try {
+                delay(delayMs)
+                if (coreEpoch.get() != epoch ||
+                    abandoned(mySession) ||
+                    explicitStop.get() ||
+                    !VpnPersist.isWanted(this@ProxyVpnService)
+                ) {
+                    RuntimeLog.info("已取消 Xray 核心自动重启", "xray")
+                    return@launch
+                }
+                followUp = restartCore(mySession, epoch)
+            } finally {
+                coreRestartGate.set(false)
+            }
+            if (followUp != null) onCoreDied(mySession, followUp)
+        }
+        coreRestartJob.set(job)
+    }
+
+    private suspend fun restartCore(mySession: Int, epoch: Int): String? {
+        if (coreEpoch.get() != epoch || abandoned(mySession) || explicitStop.get() || !VpnPersist.isWanted(this)) {
+            return null
+        }
+        val currentTun = tun
+        val config = lastGenerated
+        val file = lastConfigFile
+        if (currentTun == null || config == null || file == null) {
+            RuntimeLog.warn("无法在现有 TUN 上重启核心，改为重建 VPN", "xray")
+            startProxy(mySession)
+            return null
+        }
+        return try {
+            (application as PasswallApp).engine.start(config, file, currentTun)
+            if (!coroutineContext.isActive ||
+                coreEpoch.get() != epoch ||
+                abandoned(mySession) ||
+                explicitStop.get() ||
+                !VpnPersist.isWanted(this)
+            ) {
+                runCatching { (application as PasswallApp).engine.stop() }
+                return null
+            }
+            consecutiveSocksFailures = 0
+            coreHealthySinceElapsed = SystemClock.elapsedRealtime()
+            val name = lastNodeName.ifBlank { "当前节点" }
+            lastNodeName = name
+            RuntimeLog.info("Xray 核心已重新拉起：$name", "xray")
+            armCoreWatch()
+            ProxyRuntime.markStarted("Xray 核心已重新连接")
+            null
+        } catch (t: Throwable) {
+            val message = t.message ?: t.javaClass.simpleName
+            RuntimeLog.error("Xray 核心重启失败：$message", "xray")
+            message
+        }
+    }
+
+    private fun socksAccepting(port: Int): Boolean {
+        return try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress("127.0.0.1", port), CoreWatch.SOCKS_TIMEOUT_MS)
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun cancelCoreRestart() {
+        coreEpoch.incrementAndGet()
+        coreWatchArmed.set(false)
+        consecutiveSocksFailures = 0
+        coreRestartJob.getAndSet(null)?.cancel()
+        coreRestartGate.set(false)
+        coreWatchJob?.cancel()
+        coreWatchJob = null
+        runCatching { (application as PasswallApp).engine.clearOnUnexpectedStop(coreListenerToken) }
+    }
+
     private fun failStart(mySession: Int, message: String, retryable: Boolean) {
         if (abandoned(mySession)) return
         ProxyRuntime.markError(message)
@@ -262,6 +479,7 @@ class ProxyVpnService : VpnService() {
 
     private fun tearDown(message: String) {
         if (!tornDown.compareAndSet(false, true)) return
+        cancelCoreRestart()
         session.incrementAndGet()
         runCatching { (application as PasswallApp).engine.stop() }
         runCatching { tun?.close() }

@@ -1,5 +1,7 @@
 package com.passwall.corexray
 
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,13 @@ interface XrayEngine {
     fun stop()
     fun isRunning(): Boolean
     fun measureProxyDelay(url: String = DEFAULT_PROBE_URL): DelayResult
+
+    /**
+     * Fired when this core stops without [stop]. [owner] lets a destroyed VpnService
+     * ignore a clear from an older instance.
+     */
+    fun setOnUnexpectedStop(owner: Any, listener: () -> Unit)
+    fun clearOnUnexpectedStop(owner: Any)
 }
 
 const val DEFAULT_PROBE_URL = "https://www.gstatic.com/generate_204"
@@ -53,24 +62,38 @@ const val DEFAULT_PROBE_URL = "https://www.gstatic.com/generate_204"
  */
 class Libv2rayEngine : XrayEngine {
     private val running = AtomicBoolean(false)
+    private val stopRequested = AtomicBoolean(false)
+    private val generation = java.util.concurrent.atomic.AtomicInteger(0)
     private val _status = MutableStateFlow(XrayStatus(coreVersion = versionOrUnknown()))
     override val status: StateFlow<XrayStatus> = _status.asStateFlow()
-
-    private val callback = object : CoreCallbackHandler {
-        override fun startup(): Long = 0
-        override fun shutdown(): Long = 0
-        override fun onEmitStatus(p0: Long, p1: String?): Long {
-            Log.i(TAG, "core: $p1")
-            return 0
-        }
-    }
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     @Volatile
     private var controller: CoreController? = null
 
+    @Volatile
+    private var unexpectedStop: (() -> Unit)? = null
+
+    @Volatile
+    private var unexpectedStopOwner: Any? = null
+
+    override fun setOnUnexpectedStop(owner: Any, listener: () -> Unit) {
+        unexpectedStopOwner = owner
+        unexpectedStop = listener
+    }
+
+    override fun clearOnUnexpectedStop(owner: Any) {
+        if (unexpectedStopOwner === owner) {
+            unexpectedStopOwner = null
+            unexpectedStop = null
+        }
+    }
+
     @Synchronized
     override fun start(config: GeneratedConfig, configFile: File, tun: ParcelFileDescriptor?) {
         stop()
+        val gen = generation.incrementAndGet()
+        stopRequested.set(false)
         _status.value = XrayStatus(
             state = XrayState.STARTING,
             message = "正在启动 Xray…",
@@ -88,7 +111,7 @@ class Libv2rayEngine : XrayEngine {
         val assetDir = configFile.parentFile?.absolutePath
             ?: throw IllegalStateException("缺少 Xray 资源目录")
         Libv2ray.initCoreEnv(assetDir, "")
-        val core = Libv2ray.newCoreController(callback)
+        val core = Libv2ray.newCoreController(callbackFor(gen))
         controller = core
         try {
             core.startLoop(json, tun.fd)
@@ -105,6 +128,22 @@ class Libv2rayEngine : XrayEngine {
             RuntimeLog.error("Xray 启动失败：${t.message ?: t.javaClass.simpleName}", "xray")
             throw t
         }
+        // v26.1.13 sets IsRunning before core.Start() returns. If it is already
+        // false, the instance died inside startLoop.
+        if (!core.isRunning) {
+            controller = null
+            running.set(false)
+            val message = "Xray 核心启动后立即退出"
+            _status.value = XrayStatus(
+                state = XrayState.ERROR,
+                message = message,
+                lastError = message,
+                usingStub = false,
+                coreVersion = versionOrUnknown(),
+            )
+            RuntimeLog.error(message, "xray")
+            throw IllegalStateException(message)
+        }
         running.set(true)
         _status.value = XrayStatus(
             state = XrayState.RUNNING,
@@ -120,6 +159,8 @@ class Libv2rayEngine : XrayEngine {
 
     @Synchronized
     override fun stop() {
+        stopRequested.set(true)
+        generation.incrementAndGet()
         val core = controller
         controller = null
         running.set(false)
@@ -147,12 +188,63 @@ class Libv2rayEngine : XrayEngine {
             if (ms >= 0) DelayResult(true, ms)
             else DelayResult(false, error = "探测失败")
         } catch (t: Throwable) {
-            DelayResult(false, error = t.message ?: t.javaClass.simpleName)
+            val message = t.message ?: t.javaClass.simpleName
+            if (measureErrorMeansCoreGone(message)) {
+                noteCoreGone(generation.get(), "measureDelay：$message")
+            }
+            DelayResult(false, error = message)
         }
+    }
+
+    private fun callbackFor(gen: Int) = object : CoreCallbackHandler {
+        override fun startup(): Long {
+            Log.i(TAG, "core startup gen=$gen")
+            return 0
+        }
+
+        override fun shutdown(): Long {
+            // This AAR's StopLoop does not call shutdown(). Hook it anyway so a
+            // newer libv2ray that does exit the loop still wakes the watcher.
+            noteCoreGone(gen, "shutdown 回调")
+            return 0
+        }
+
+        override fun onEmitStatus(code: Long, message: String?): Long {
+            val text = message?.trim().orEmpty()
+            if (text.isNotEmpty()) Log.i(TAG, "core: $text")
+            if (coreStatusMeansStopped(text)) noteCoreGone(gen, "核心状态：$text")
+            return 0
+        }
+    }
+
+    private fun noteCoreGone(gen: Int, reason: String) {
+        if (generation.get() != gen || stopRequested.get()) return
+        if (!running.compareAndSet(true, false)) return
+        controller = null
+        _status.value = XrayStatus(
+            state = XrayState.ERROR,
+            message = "Xray 核心已退出",
+            lastError = reason,
+            usingStub = false,
+            coreVersion = versionOrUnknown(),
+        )
+        RuntimeLog.error("Xray 核心已退出：$reason", "xray")
+        val listener = unexpectedStop
+        mainHandler.post { listener?.invoke() }
     }
 
     companion object {
         private const val TAG = "passwall-xray"
+
+        internal fun coreStatusMeansStopped(message: String): Boolean {
+            val text = message.trim().lowercase()
+            return text == "core stopped" || text.contains("core stopped")
+        }
+
+        internal fun measureErrorMeansCoreGone(message: String): Boolean {
+            val text = message.lowercase()
+            return text.contains("core instance is nil") || text.contains("core is not running")
+        }
         fun versionOrUnknown(): String =
             runCatching { Libv2ray.checkVersionX() }.getOrDefault("libv2ray")
     }

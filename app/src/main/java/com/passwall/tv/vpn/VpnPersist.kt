@@ -15,6 +15,9 @@ internal object VpnPersist {
     private const val KEY_EXHAUSTED = "exhausted"
     private const val KEY_ATTEMPT_OPEN = "attempt_open"
     private const val KEY_LAST_FAILURE_AT = "last_failure_at"
+    private const val KEY_CORE_FAILURES = "core_failures"
+    private const val KEY_CORE_EXHAUSTED = "core_exhausted"
+    private const val KEY_LAST_CORE_FAILURE_AT = "last_core_failure_at"
     private const val KEY_NEXT_ALARM = "next_alarm_elapsed"
     private const val KEY_CONSENT_UI_AT = "consent_ui_elapsed"
     private const val KEY_TOAST_AT = "toast_elapsed"
@@ -88,6 +91,19 @@ internal object VpnPersist {
         update(context) { VpnAttemptMachine.exhaust(it) }
     }
 
+    fun recordCoreFailure(context: Context, nowMs: Long): Pair<VpnAttemptState, Boolean> =
+        synchronized(lock) {
+            val p = prefs(context)
+            val before = readLocked(p)
+            val after = VpnAttemptMachine.recordCoreFailure(before, nowMs)
+            writeLocked(p, after)
+            after to (after.coreFailures != before.coreFailures)
+        }
+
+    fun resetCoreFailures(context: Context) {
+        update(context) { VpnAttemptMachine.resetCoreFailures(it) }
+    }
+
     fun nextAlarmElapsed(context: Context): Long = synchronized(lock) {
         prefs(context).getLong(KEY_NEXT_ALARM, 0L)
     }
@@ -129,6 +145,9 @@ internal object VpnPersist {
             exhausted = p.getBoolean(KEY_EXHAUSTED, false),
             attemptOpen = p.getBoolean(KEY_ATTEMPT_OPEN, false),
             lastFailureAtMs = p.getLong(KEY_LAST_FAILURE_AT, 0L),
+            coreFailures = p.getInt(KEY_CORE_FAILURES, 0),
+            coreExhausted = p.getBoolean(KEY_CORE_EXHAUSTED, false),
+            lastCoreFailureAtMs = p.getLong(KEY_LAST_CORE_FAILURE_AT, 0L),
         )
     }
 
@@ -140,6 +159,9 @@ internal object VpnPersist {
             .putBoolean(KEY_EXHAUSTED, state.exhausted)
             .putBoolean(KEY_ATTEMPT_OPEN, state.attemptOpen)
             .putLong(KEY_LAST_FAILURE_AT, state.lastFailureAtMs)
+            .putInt(KEY_CORE_FAILURES, state.coreFailures)
+            .putBoolean(KEY_CORE_EXHAUSTED, state.coreExhausted)
+            .putLong(KEY_LAST_CORE_FAILURE_AT, state.lastCoreFailureAtMs)
             .commit()
     }
 }

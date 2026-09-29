@@ -52,3 +52,7 @@ Auto-reconnect (0.1.8), including 当贝 / Dangbei boxes that kill background ap
   - Failed starts back off (2s, 5s, 15s, 30s, 60s, 120s) and stop after 6 failures.
     The reason is written to the web admin 日志. A kill after a healthy start
     does not consume those retries.
+  - If the app process stays alive but the Xray core stops (startLoop/core exit,
+    or 127.0.0.1:10808 stops accepting), Passwall restarts that core on the same
+    TUN and node. That path has its own 6-try cap and Chinese web-admin logs.
+    Pressing 停止 cancels it. A core that stays up for about a minute clears the count.

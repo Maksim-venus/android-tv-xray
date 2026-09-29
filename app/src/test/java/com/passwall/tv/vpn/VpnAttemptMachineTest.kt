@@ -126,6 +126,52 @@ class VpnAttemptMachineTest {
     }
 
     @Test
+    fun explicitStopClearsCoreRestart() {
+        val crashed = VpnAttemptMachine.recordCoreFailure(
+            VpnAttemptState(wanted = true, nodeId = 4),
+            nowMs = 1_000L,
+        )
+        assertEquals(1, crashed.coreFailures)
+        assertTrue(VpnAttemptMachine.shouldRestartCore(crashed, explicitStop = false))
+        val stopped = VpnAttemptMachine.clearWanted(crashed)
+        assertEquals(0, stopped.coreFailures)
+        assertFalse(stopped.coreExhausted)
+        assertFalse(VpnAttemptMachine.shouldRestartCore(stopped, explicitStop = true))
+        assertFalse(VpnAttemptMachine.shouldRestartCore(stopped, explicitStop = false))
+    }
+
+    @Test
+    fun coreCrashLoopStopsAtSixAndUserStartResets() {
+        var state = VpnAttemptState(wanted = true, nodeId = 8)
+        var now = 5_000L
+        repeat(VpnRetryPolicy.MAX_FAILURES) { index ->
+            now += 5_000L
+            state = VpnAttemptMachine.recordCoreFailure(state, now)
+            assertEquals(index + 1, state.coreFailures)
+        }
+        assertTrue(state.coreExhausted)
+        assertFalse(VpnAttemptMachine.shouldRestartCore(state, explicitStop = false))
+        val again = VpnAttemptMachine.recordCoreFailure(state, now + 5_000L)
+        assertEquals(VpnRetryPolicy.MAX_FAILURES, again.coreFailures)
+        val started = VpnAttemptMachine.prepareUserStart(state, nodeId = null)
+        assertEquals(0, started.coreFailures)
+        assertFalse(started.coreExhausted)
+        assertTrue(VpnAttemptMachine.shouldRestartCore(started, explicitStop = false))
+    }
+
+    @Test
+    fun coreFailureDedupedAndTunnelAckDoesNotClearIt() {
+        val once = VpnAttemptMachine.recordCoreFailure(VpnAttemptState(wanted = true), nowMs = 1_000L)
+        val twice = VpnAttemptMachine.recordCoreFailure(once, nowMs = 1_000L + 400L)
+        assertEquals(1, twice.coreFailures)
+        val acked = VpnAttemptMachine.ackRunning(twice, startedNodeId = 3)
+        assertEquals(1, acked.coreFailures)
+        val stable = VpnAttemptMachine.resetCoreFailures(acked)
+        assertEquals(0, stable.coreFailures)
+        assertFalse(stable.coreExhausted)
+    }
+
+    @Test
     fun backoffLadderThenCap() {
         assertEquals(VpnRetryPolicy.DESTROY_RESTART_MS, VpnRetryPolicy.delayFor(0))
         assertEquals(2_000L, VpnRetryPolicy.delayFor(1))

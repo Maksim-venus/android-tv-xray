@@ -17,6 +17,9 @@ data class VpnAttemptState(
     val exhausted: Boolean = false,
     val attemptOpen: Boolean = false,
     val lastFailureAtMs: Long = 0,
+    val coreFailures: Int = 0,
+    val coreExhausted: Boolean = false,
+    val lastCoreFailureAtMs: Long = 0,
 )
 
 enum class AttemptGate {
@@ -37,6 +40,9 @@ object VpnAttemptMachine {
             // Leave the attempt closed until VpnService actually begins. Otherwise a
             // restore that wins the race with ACTION_START counts this click as a failure.
             attemptOpen = false,
+            coreFailures = 0,
+            coreExhausted = false,
+            lastCoreFailureAtMs = 0,
         )
     }
 
@@ -46,6 +52,9 @@ object VpnAttemptMachine {
             failures = 0,
             exhausted = false,
             attemptOpen = false,
+            coreFailures = 0,
+            coreExhausted = false,
+            lastCoreFailureAtMs = 0,
         )
     }
 
@@ -61,6 +70,9 @@ object VpnAttemptMachine {
                 failures = 0,
                 exhausted = false,
                 attemptOpen = true,
+                coreFailures = 0,
+                coreExhausted = false,
+                lastCoreFailureAtMs = 0,
             ) to AttemptGate.PROCEED
         }
         if (!state.wanted) return state to AttemptGate.NOT_WANTED
@@ -119,5 +131,32 @@ object VpnAttemptMachine {
 
     fun shouldAutoRestart(state: VpnAttemptState, explicitStop: Boolean): Boolean {
         return state.wanted && !explicitStop && !state.exhausted
+    }
+
+    /**
+     * Xray/libv2ray died while the process and VpnService are still up.
+     * Separate from [failures] so a core crash does not eat the process-kill budget,
+     * and a successful tunnel ack does not erase a core crash loop.
+     */
+    fun recordCoreFailure(state: VpnAttemptState, nowMs: Long): VpnAttemptState {
+        if (!state.wanted || state.coreExhausted) return state
+        if (state.lastCoreFailureAtMs != 0L && nowMs - state.lastCoreFailureAtMs < FAILURE_DEDUPE_MS) {
+            return state
+        }
+        val failures = state.coreFailures + 1
+        return state.copy(
+            coreFailures = failures,
+            coreExhausted = failures >= VpnRetryPolicy.MAX_FAILURES,
+            lastCoreFailureAtMs = nowMs,
+        )
+    }
+
+    fun resetCoreFailures(state: VpnAttemptState): VpnAttemptState {
+        if (!state.wanted) return state
+        return state.copy(coreFailures = 0, coreExhausted = false, lastCoreFailureAtMs = 0)
+    }
+
+    fun shouldRestartCore(state: VpnAttemptState, explicitStop: Boolean): Boolean {
+        return state.wanted && !explicitStop && !state.coreExhausted && !state.exhausted
     }
 }
