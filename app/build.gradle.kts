@@ -10,10 +10,11 @@ android {
 
     defaultConfig {
         applicationId = "com.passwall.tv"
-        minSdk = 28
+        // Floor for the legacy flavor (Android 7.1). Modern overrides this to 31.
+        minSdk = 25
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 8
+        versionName = "0.1.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -25,12 +26,12 @@ android {
             dimension = "device"
             applicationIdSuffix = ".legacy"
             versionNameSuffix = "-legacy"
-            minSdk = 28
+            minSdk = 25
             ndk {
                 abiFilters += listOf("armeabi-v7a", "arm64-v8a")
             }
             buildConfigField("boolean", "ENABLE_IPV6", "false")
-            buildConfigField("int", "FLAVOR_MIN_SDK", "28")
+            buildConfigField("int", "FLAVOR_MIN_SDK", "25")
             resValue("string", "flavor_label", "legacy")
         }
         create("modern") {

@@ -87,7 +87,9 @@ class ProxyVpnService : VpnService() {
                 builder.addAddress("fd00:85::2", 128)
                 builder.addRoute("::", 0)
             }
-            // Avoid API 29+ Builder helpers so the same path stays valid on Android 9 / kernel 4.x.
+            // Avoid API 29+ Builder helpers (setMetered, excludeRoute) so this path stays
+            // valid on Android 7.1 (API 25) / kernel 4.x. setBlocking and
+            // addDisallowedApplication are API 21.
             tun?.close()
             tun = builder.establish()
             if (tun == null) {
