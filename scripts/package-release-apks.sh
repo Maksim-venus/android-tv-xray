@@ -2,8 +2,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/dist"
-VERSION="${1:-0.1.6}"
+VERSION="${1:-0.1.7}"
 mkdir -p "$DEST"
+if [[ -f "$ROOT/INSTALL.txt" ]]; then
+  cp -f "$ROOT/INSTALL.txt" "$DEST/INSTALL.txt"
+fi
 legacy="$ROOT/app/build/outputs/apk/legacy/release/app-legacy-release.apk"
 modern="$ROOT/app/build/outputs/apk/modern/release/app-modern-release.apk"
 cp -f "$legacy" "$DEST/Passwall-TV-legacy-${VERSION}.apk"
