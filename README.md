@@ -1,6 +1,6 @@
 # Passwall TV — Android 电视 Xray 客户端
 
-打包即可安装使用。内置 **Xray-core v1.260113.0**（AndroidLibXrayLite **v26.1.13**）：点「启动」后设备流量走 TUN → Xray，国内直连、国外走代理。该核心仍支持 `allowInsecure`。
+打包即可安装使用。内置 **Xray-core v1.260113.0**（AndroidLibXrayLite **v26.1.13**）：点「启动」后设备流量走 TUN → Xray，国内直连、国外走代理。该核心仍支持 `allowInsecure`。打开应用时先显示浅色启动页（图标和 Passwall TV），首页准备好后再进入，不再黑屏干等。
 
 GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
@@ -12,17 +12,17 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 | 电视 / 盒子 | 选这个文件 |
 | --- | --- |
-| **Android 7.1+（API 25）/ 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.8.apk`（包名 `com.passwall.tv.legacy`） |
-| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.8.apk`（包名 `com.passwall.tv`） |
+| **Android 7.1+（API 25）/ 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.9.apk`（包名 `com.passwall.tv.legacy`） |
+| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.9.apk`（包名 `com.passwall.tv`） |
 
 不确定就先装 **legacy**。两个可以同时装（包名不同）。
 
 成品路径（本机构建后，可直接拷走安装）：
 
-- `/workspace/dist/Passwall-TV-legacy-0.1.8.apk`
-- `/workspace/dist/Passwall-TV-modern-0.1.8.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.8.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.8.apk`
+- `/workspace/dist/Passwall-TV-legacy-0.1.9.apk`
+- `/workspace/dist/Passwall-TV-modern-0.1.9.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.9.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.9.apk`
 - 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
 - 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
 
@@ -38,9 +38,9 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 ```bash
 adb connect 电视IP:5555
-adb install -r dist/Passwall-TV-legacy-0.1.8.apk
+adb install -r dist/Passwall-TV-legacy-0.1.9.apk
 # 或
-adb install -r dist/Passwall-TV-modern-0.1.8.apk
+adb install -r dist/Passwall-TV-modern-0.1.9.apk
 ```
 
 ### 3. 第一次使用
@@ -68,8 +68,8 @@ adb install -r dist/Passwall-TV-modern-0.1.8.apk
 
 | Device | APK |
 | --- | --- |
-| Android 7.1+ (API 25) / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.8.apk` |
-| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.8.apk` |
+| Android 7.1+ (API 25) / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.9.apk` |
+| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.9.apk` |
 
 Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an empty node list. Enable HTTP edit on the TV, import `vless://` / `vmess://` from a phone on the same LAN, select the node, press 启动, accept the VPN dialog.
 

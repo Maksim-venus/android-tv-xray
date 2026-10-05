@@ -47,6 +47,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Theme.Passwall.Splash paints logo + "Passwall TV" as the window
+        // background. It stays up until this Compose tree draws its first frame.
         setContent {
             val vm: PasswallViewModel = viewModel()
             val home by vm.home.collectAsStateWithLifecycle()

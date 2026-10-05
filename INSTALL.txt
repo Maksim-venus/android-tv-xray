@@ -1,26 +1,31 @@
-Passwall TV 0.1.8 — install notes
+Passwall TV 0.1.9 — install notes
 ================================
 
 Pick one APK:
 
   Android 7.1+ (API 25) / old box / Linux kernel 4.x / 32-bit
-    Passwall-TV-legacy-0.1.8.apk
+    Passwall-TV-legacy-0.1.9.apk
     package: com.passwall.tv.legacy
     minSdk: 25
     ABIs: armeabi-v7a + arm64-v8a
 
   Android 12+ (API 31) 64-bit TV
-    Passwall-TV-modern-0.1.8.apk
+    Passwall-TV-modern-0.1.9.apk
     package: com.passwall.tv
     minSdk: 31
     ABI: arm64-v8a
 
 If you are not sure, install legacy. The two packages can be installed together.
 
+Upgrade from 0.1.8: `adb install -r` works when the signature matches. These
+release APKs are signed with the Android debug keystore of the build machine.
+If the box reports a signature conflict, uninstall the old package first
+(that clears saved nodes and the auto-reconnect flag), then install 0.1.9.
+
 Sideload (USB file manager or adb):
 
   adb connect <tv-ip>:5555
-  adb install -r Passwall-TV-legacy-0.1.8.apk
+  adb install -r Passwall-TV-legacy-0.1.9.apk
 
 Fresh install has no built-in nodes. On the TV: Settings → enable insecure SSL if needed → enable HTTP edit → open the shown http://192.168.x.x:8787 URL from a phone on the same LAN → import vless:// or vmess:// → select the node → 启动 → accept the system VPN dialog.
 
@@ -33,7 +38,14 @@ Android 7.1 (API 25) caveats for the legacy APK:
   - Flag emoji in the connectivity test may show as two letters. The exit IP still comes from ipinfo.io.
   - This build still embeds AndroidLibXrayLite v26.1.13 (real libv2ray / libgojni.so, allowInsecure + TUN startLoop). It is not a stub core.
 
-Auto-reconnect (0.1.8), including 当贝 / Dangbei boxes that kill background apps:
+Launch screen (0.1.9):
+
+  - The first frame after you open the app is a light splash: logo and "Passwall TV".
+  - It stays until the home screen is ready. There is no extra wait after that.
+  - Copying and checking geosite/geoip, and loading the Xray native library, no longer
+    run on the main thread at startup.
+
+Auto-reconnect (since 0.1.8), including 当贝 / Dangbei boxes that kill background apps:
 
   - After the tunnel comes up, Passwall stores "VPN should be on" and the selected node id.
   - Pressing 停止 clears that flag. A deliberate Stop does not auto-restart.
