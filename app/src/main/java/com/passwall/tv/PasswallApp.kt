@@ -40,7 +40,6 @@ class PasswallApp : Application() {
         val db = AppDatabase.create(this)
         repository = PasswallRepository(db)
         routingAssets = RoutingAssetStore(this)
-        routingAssets.installBundledDefaults()
         assetUpdater = RoutingAssetUpdater(
             store = routingAssets,
             repository = repository,
@@ -107,6 +106,10 @@ class PasswallApp : Application() {
             ),
         )
         RuntimeLog.info("Passwall 已启动", "app")
+        // geosite.dat is ~11MB. Validating it (and copying it on first launch)
+        // used to run here on the main thread, so the window stayed black until
+        // it finished. The VPN start path installs the same files before Xray.
+        appScope.launch(Dispatchers.IO) { routingAssets.installBundledDefaults() }
         appScope.launch { repository.ensureSettings() }
         appScope.launch {
             while (isActive) {

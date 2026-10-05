@@ -7,4 +7,9 @@
         <item name="android:navigationBarColor">#F5F5F7</item>
         <item name="android:windowFullscreen">true</item>
     </style>
+
+    <!-- Starting window. Shown by the system before the first Compose frame, including API 25. -->
+    <style name="Theme.Passwall.Splash" parent="Theme.Passwall">
+        <item name="android:windowBackground">@drawable/splash_window</item>
+    </style>
 </resources>

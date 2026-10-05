@@ -16,6 +16,7 @@ class RoutingAssetStore(private val context: Context) {
      * Copy APK defaults into [directory].
      * Last-good remote downloads are kept unless they fail [GeodataValidator].
      */
+    @Synchronized
     fun installBundledDefaults() {
         val dir = directory()
         for (name in RoutingAssetCatalog.bundledNames) {

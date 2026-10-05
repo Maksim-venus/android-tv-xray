@@ -125,10 +125,15 @@ class PasswallViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun syncAdmin(prefs: AppSettings) {
-        if (prefs.httpEditEnabled && !app.adminServer.isRunning) {
-            app.adminServer.start(prefs.httpPort)
-        } else if (!prefs.httpEditEnabled && app.adminServer.isRunning) {
-            app.adminServer.stop()
+        val shouldRun = prefs.httpEditEnabled
+        if (shouldRun == app.adminServer.isRunning) return
+        // Ktor setup must not sit on the main thread during the first frame.
+        app.appScope.launch(Dispatchers.IO) {
+            if (shouldRun) {
+                if (!app.adminServer.isRunning) app.adminServer.start(prefs.httpPort)
+            } else if (app.adminServer.isRunning) {
+                app.adminServer.stop()
+            }
         }
     }
 }

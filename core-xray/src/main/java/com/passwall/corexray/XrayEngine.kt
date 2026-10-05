@@ -64,7 +64,9 @@ class Libv2rayEngine : XrayEngine {
     private val running = AtomicBoolean(false)
     private val stopRequested = AtomicBoolean(false)
     private val generation = java.util.concurrent.atomic.AtomicInteger(0)
-    private val _status = MutableStateFlow(XrayStatus(coreVersion = versionOrUnknown()))
+    // Do not call into libv2ray here. checkVersionX() loads libgojni.so, which
+    // on a 当贝 box blocks the main thread for the whole cold start.
+    private val _status = MutableStateFlow(XrayStatus())
     override val status: StateFlow<XrayStatus> = _status.asStateFlow()
     private val mainHandler = Handler(Looper.getMainLooper())
 
