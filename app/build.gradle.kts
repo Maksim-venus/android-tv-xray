@@ -19,6 +19,28 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    val releaseKeystoreFile = (
+        System.getenv("RELEASE_KEYSTORE_FILE")
+            ?: project.findProperty("RELEASE_KEYSTORE_FILE") as String?
+        )?.takeIf { it.isNotBlank() }
+    val releaseStorePassword = (
+        System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            ?: project.findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
+        )?.takeIf { it.isNotBlank() }
+    val releaseKeyAlias = (
+        System.getenv("RELEASE_KEY_ALIAS")
+            ?: project.findProperty("RELEASE_KEY_ALIAS") as String?
+        )?.takeIf { it.isNotBlank() }
+    val releaseKeyPassword = (
+        System.getenv("RELEASE_KEY_PASSWORD")
+            ?: project.findProperty("RELEASE_KEY_PASSWORD") as String?
+        )?.takeIf { it.isNotBlank() }
+    val releaseKeystore = releaseKeystoreFile?.let { file(it) }
+    val hasReleaseKeystore = releaseKeystore != null && releaseKeystore.isFile &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
     flavorDimensions += "device"
 
     productFlavors {
@@ -46,6 +68,20 @@ android {
         }
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = releaseStorePassword!!
+                keyAlias = releaseKeyAlias!!
+                keyPassword = releaseKeyPassword!!
+                // v1 (JAR) is what some Android 7.1 boxes install. v2 is what stock Android 7+ checks.
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -53,7 +89,12 @@ android {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
-            signingConfig = signingConfigs.getByName("debug")
+            // Local builds without the release key stay debug-signed. CI always sets the env vars.
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
