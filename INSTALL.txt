@@ -1,75 +1,88 @@
-Passwall TV 0.1.9 — install notes
-================================
+Passwall TV 0.1.10 安装说明
+========================
 
-Pick one APK:
+按电视的 Android 版本选一个文件：
 
-  Android 7.1+ (API 25) / old box / Linux kernel 4.x / 32-bit
-    Passwall-TV-legacy-0.1.9.apk
-    package: com.passwall.tv.legacy
-    minSdk: 25
-    ABIs: armeabi-v7a + arm64-v8a
+  Android 7.0 及以上（API 24），包括当贝 Android 7.1、32 位、Linux 内核 4.x
+    Passwall-TV-Android7.0+-0.1.10.apk
+    包名：com.passwall.tv.legacy
+    最低系统：Android 7.0（API 24）
+    CPU：armeabi-v7a + arm64-v8a
 
-  Android 12+ (API 31) 64-bit TV
-    Passwall-TV-modern-0.1.9.apk
-    package: com.passwall.tv
-    minSdk: 31
-    ABI: arm64-v8a
+  Android 12 及以上（API 31）的 64 位电视
+    Passwall-TV-Android12+-0.1.10.apk
+    包名：com.passwall.tv
+    最低系统：Android 12（API 31）
+    CPU：arm64-v8a
 
-If you are not sure, install legacy. The two packages can be installed together.
+拿不准就装 Android7.0+ 那个。两个包名不同，可以同时装。
 
-Signing: this 0.1.9 build uses a new long-lived release key. It does not match
-v0.1.7, v0.1.8, or the first v0.1.9 upload. Uninstall the older package once
-(that clears saved nodes and the auto-reconnect flag), then install this APK.
-Every later update is signed with this same key and installs over the top
-(`adb install -r`) without another uninstall.
+当贝 Android 7.1 请装 Passwall-TV-Android7.0+-0.1.10.apk，不要装 Android12+。
 
-Sideload (USB file manager or adb):
+为什么不是 Android 5.0 / 5.1 / 6.0：
+  界面用的 Compose 可以到 Android 5.0（API 21）。当前内置的
+  AndroidLibXrayLite v26.1.13（libv2ray.aar）自己声明 minSdk 24，
+  libgojni.so 的 Android ELF 标记也是 API 24。Android 7.0 以下的系统
+  拒绝加载这个原生库，Xray 起不来。更旧的官方 AAR 没有 TUN / startLoop，
+  带不了这条 VPN。所以旧盒子包的下限是 Android 7.0，不是 5.0。
 
-  adb connect <tv-ip>:5555
-  adb install -r Passwall-TV-legacy-0.1.9.apk
+签名和升级：
+  本版和重新签名后的 v0.1.9 是同一把长期发布密钥。
+  已经装过那一版 0.1.9 的，直接覆盖安装，节点还在：
+    adb install -r Passwall-TV-Android7.0+-0.1.10.apk
+  如果盒子上还是 v0.1.7、v0.1.8，或第一次上传的那份 0.1.9（签名不同），
+  需要先卸载再装，已保存的节点会清空。以后的更新都用这把密钥，可以覆盖安装。
 
-Fresh install has no built-in nodes. On the TV: Settings → enable insecure SSL if needed → enable HTTP edit → open the shown http://192.168.x.x:8787 URL from a phone on the same LAN → import vless:// or vmess:// → select the node → 启动 → accept the system VPN dialog.
+安装：
 
-Android 7.1 (API 25) caveats for the legacy APK:
+  adb connect <电视IP>:5555
+  adb install -r Passwall-TV-Android7.0+-0.1.10.apk
 
-  - Install requires API 25+. Android 7.0 (API 24) and older are not supported.
-  - TUN/VPN must exist on the box. VpnService.establish() fails when the kernel has no /dev/tun (CONFIG_TUN missing) or the ROM hides the VPN consent screen. The app shows a Chinese error instead of pretending the proxy started.
-  - IPv6 routes are off on legacy. Many API 25 boxes mishandle IPv6 default routes.
-  - Foreground-service types and notification channels in the manifest apply on newer Android only. API 25 starts the VPN with startService + startForeground and does not create a notification channel.
-  - Flag emoji in the connectivity test may show as two letters. The exit IP still comes from ipinfo.io.
-  - This build still embeds AndroidLibXrayLite v26.1.13 (real libv2ray / libgojni.so, allowInsecure + TUN startLoop). It is not a stub core.
+也可以用 U 盘和电视自带的文件管理器打开 APK，允许「未知来源」。
 
-Launch screen (0.1.9):
+新安装没有内置节点。电视上：设置 → 需要的话打开「允许不安全 SSL」→
+打开 HTTP 编辑 → 用同一局域网的手机打开屏幕上的 http://192.168.x.x:8787 →
+导入 vless:// 或 vmess:// → 选中节点 → 启动 → 允许系统 VPN 对话框。
 
-  - The first frame after you open the app is a light splash: logo and "Passwall TV".
-  - It stays until the home screen is ready. There is no extra wait after that.
-  - Copying and checking geosite/geoip, and loading the Xray native library, no longer
-    run on the main thread at startup.
+Android 7.0 / 7.1 旧盒子（Android7.0+ 这个包）：
 
-Auto-reconnect (since 0.1.8), including 当贝 / Dangbei boxes that kill background apps:
+  - 低于 Android 7.0 不能安装。
+  - 必须有 /dev/tun。内核没开 CONFIG_TUN，或系统藏起 VPN 授权界面时，
+    VpnService.establish() 会失败。应用会用中文说明，不会假装已经连上。
+  - 这个包关闭 IPv6 路由。不少 API 24/25 盒子处理 IPv6 默认路由会出错。
+  - 清单里的前台服务类型和通知渠道只在较新的 Android 上生效。
+    Android 8.0 以下用 startService + startForeground，不创建通知渠道。
+  - 连通性测试里的国旗在旧系统上可能显示成两个字母，出口 IP 仍然来自 ipinfo.io。
+  - 系统信任库很老时，用系统 HTTPS 下载 geosite/geoip 或访问 ipinfo 可能失败
+    （例如还没有 Let's Encrypt 根证书）。代理本身走 Xray 自带的 TLS，不靠系统信任库。
+    分流数据失败时继续用 APK 里自带的文件，网页管理里会写出中文原因。
+  - 本版仍内置 AndroidLibXrayLite v26.1.13（真实 libv2ray / libgojni.so，
+    allowInsecure + TUN startLoop），不是空的核心。
 
-  - After the tunnel comes up, Passwall stores "VPN should be on" and the selected node id.
-  - Pressing 停止 clears that flag. A deliberate Stop does not auto-restart.
-  - If the process is killed while the flag is set, VpnService returns START_STICKY
-    (on API 25 the system recreates the service with a null intent) and a ~15s
-    watchdog alarm starts the process if the ROM ignores sticky services.
-  - Boot, quick-boot, and app update also restore when the flag is still set.
-  - Many Dangbei ROMs drop the VPN consent when they kill the app. The system
-    then shows the VPN permission dialog again. The app cannot accept it silently:
-    you get a Chinese toast and, when the screen can show it, the system dialog.
-    Open Passwall and tap 允许 if the tunnel does not return.
-  - If the box has 自启动, 后台运行, or a battery whitelist, add Passwall.
-    Legacy package name: com.passwall.tv.legacy.
-  - A force-stop from system settings cancels alarms until you open the app once.
-    Opening it tries to restore.
-  - Failed starts back off (2s, 5s, 15s, 30s, 60s, 120s) and stop after 6 failures.
-    The reason is written to the web admin 日志. A kill after a healthy start
-    does not consume those retries.
-  - If the app process stays alive but the Xray core stops (startLoop/core exit,
-    or 127.0.0.1:10808 stops accepting), Passwall restarts that core on the same
-    TUN and node. That path has its own 6-try cap and Chinese web-admin logs.
-    Pressing 停止 cancels it. A core that stays up for about a minute clears the count.
-  - After a successful start, if geoip/geosite were never updated or are older than
-    7 days, Passwall downloads them (mainland mirrors first; GitHub last). The web
-    admin 系统 page shows the last success time, or a Chinese failure reason instead
-    of staying on 「尚未更新」. 「立即更新」 retries without waiting.
+启动画面（0.1.9 起，本版同样）：
+
+  - 打开后的第一帧是浅色启动页：图标和「Passwall TV」。
+  - 首页准备好就进入，没有额外等待。
+  - 复制和检查 geosite/geoip、加载 Xray 原生库，不再堵在主线程上。
+
+自动重连（0.1.8 起），包括当贝这类会杀后台的盒子：
+
+  - 隧道起来之后，Passwall 记住「VPN 应该开着」和当前节点。
+  - 按「停止」会清掉这个标记。主动停止不会再自动拉起。
+  - 进程被杀时，VpnService 返回 START_STICKY（Android 7.x 上系统会用空 Intent
+    把服务建回来），另外大约 15 秒有一次看门狗闹钟。
+  - 开机、快速开机、应用更新后，只要标记还在，也会尝试恢复。
+  - 很多当贝 ROM 杀掉应用后会丢掉 VPN 授权，系统会再次弹出权限对话框。
+    应用不能替你点允许：会有中文提示，能显示时就是系统对话框。
+    隧道没回来就打开 Passwall，点允许。
+  - 如果盒子有「自启动」「后台运行」或电池白名单，把 Passwall 加进去。
+    旧盒子包名：com.passwall.tv.legacy。
+  - 在系统设置里强制停止会取消闹钟，需要再打开一次应用。打开后会尝试恢复。
+  - 启动失败会退避（2 秒、5 秒、15 秒、30 秒、60 秒、120 秒），6 次后停止。
+    原因写在网页管理的日志里。已经正常连上之后被杀掉，不消耗这 6 次。
+  - 应用进程还在、但 Xray 核心停了（startLoop 退出，或 127.0.0.1:10808
+    不再接受连接）时，会在同一个 TUN 和节点上把核心拉起来。这条路径另外
+    有 6 次上限和中文日志。按「停止」会取消。核心稳定跑大约一分钟后计数清零。
+  - 启动成功后，如果 geoip/geosite 从没更新或超过 7 天，会去下载
+    （先大陆镜像，最后 GitHub）。网页管理的系统页显示上次成功时间，
+    失败则显示中文原因，而不是一直停在「尚未更新」。「立即更新」可以马上重试。

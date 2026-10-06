@@ -8,7 +8,7 @@
         <item name="android:windowFullscreen">true</item>
     </style>
 
-    <!-- Starting window. Shown by the system before the first Compose frame, including API 25. -->
+    <!-- Starting window. Shown by the system before the first Compose frame, including API 24. -->
     <style name="Theme.Passwall.Splash" parent="Theme.Passwall">
         <item name="android:windowBackground">@drawable/splash_window</item>
     </style>

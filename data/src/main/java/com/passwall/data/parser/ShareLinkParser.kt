@@ -9,7 +9,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.util.Base64
 
 data class ParseResult(
     val nodes: List<ProxyNode>,
@@ -206,7 +205,35 @@ internal fun decodeBase64(value: String): ByteArray {
             val rem = raw.length % 4
             if (rem == 0) raw else raw + "=".repeat(4 - rem)
         }
-    return Base64.getDecoder().decode(padded)
+    // java.util.Base64 is API 26. Legacy devices start at API 24, so decode here.
+    return decodeStandardBase64(padded)
+}
+
+private val BASE64_ALPHABET =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+private fun decodeStandardBase64(input: String): ByteArray {
+    val table = IntArray(128) { -1 }
+    BASE64_ALPHABET.forEachIndexed { index, char -> table[char.code] = index }
+    val out = ArrayList<Byte>(input.length * 3 / 4)
+    var buffer = 0
+    var bits = 0
+    for (char in input) {
+        if (char == '=') break
+        if (char.code >= table.size) throw IllegalArgumentException("无效的 Base64")
+        val value = table[char.code]
+        if (value < 0) {
+            if (char == '\n' || char == '\r' || char == ' ' || char == '\t') continue
+            throw IllegalArgumentException("无效的 Base64")
+        }
+        buffer = (buffer shl 6) or value
+        bits += 6
+        if (bits >= 8) {
+            bits -= 8
+            out.add(((buffer shr bits) and 0xFF).toByte())
+        }
+    }
+    return out.toByteArray()
 }
 
 internal fun decodeBase64Json(value: String): JsonObject {

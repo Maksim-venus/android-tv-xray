@@ -99,7 +99,7 @@ class ProxyVpnService : VpnService() {
         acceptedStart = true
         ProxyRuntime.noteServiceStarted()
         val mySession = session.incrementAndGet()
-        runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
+        runCatching { promoteToForeground() }
             .onFailure { RuntimeLog.warn("前台通知失败：${it.message}", "vpn") }
         VpnWatchdog.scheduleHealthy(this)
         liveScope().launch { startProxy(mySession) }
@@ -111,7 +111,7 @@ class ProxyVpnService : VpnService() {
     private fun stopWithoutRestart(message: String): Int {
         explicitStop.set(true)
         VpnWatchdog.cancel(this)
-        runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
+        runCatching { promoteToForeground() }
         tearDown(message)
         return START_NOT_STICKY
     }
@@ -526,6 +526,23 @@ class ProxyVpnService : VpnService() {
         }
         tearDown("系统已撤销 VPN")
         super.onRevoke()
+    }
+
+    /**
+     * API 34+ requires the special-use type when targetSdk is 34 or higher.
+     * API 24–33 keep the two-argument call; the type constant does not exist there.
+     */
+    private fun promoteToForeground() {
+        val notification = buildNotification()
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildNotification(): Notification {

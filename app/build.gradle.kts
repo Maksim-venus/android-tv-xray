@@ -10,11 +10,12 @@ android {
 
     defaultConfig {
         applicationId = "com.passwall.tv"
-        // Floor for the legacy flavor (Android 7.1). Modern overrides this to 31.
-        minSdk = 25
+        // Floor for the legacy flavor (Android 7.0). Modern overrides this to 31.
+        // libv2ray.aar and libgojni.so require API 24, so 21–23 cannot load Xray.
+        minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.1.9"
+        versionCode = 11
+        versionName = "0.1.10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -48,12 +49,12 @@ android {
             dimension = "device"
             applicationIdSuffix = ".legacy"
             versionNameSuffix = "-legacy"
-            minSdk = 25
+            minSdk = 24
             ndk {
                 abiFilters += listOf("armeabi-v7a", "arm64-v8a")
             }
             buildConfigField("boolean", "ENABLE_IPV6", "false")
-            buildConfigField("int", "FLAVOR_MIN_SDK", "25")
+            buildConfigField("int", "FLAVOR_MIN_SDK", "24")
             resValue("string", "flavor_label", "legacy")
         }
         create("modern") {

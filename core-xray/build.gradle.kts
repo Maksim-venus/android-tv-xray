@@ -32,8 +32,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Must not exceed the legacy app flavor (API 25) or manifest merger raises it.
-        minSdk = 25
+        // Match the legacy app floor. libv2ray.aar's own manifest is minSdk 24.
+        minSdk = 24
         consumerProguardFiles("consumer-rules.pro")
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
