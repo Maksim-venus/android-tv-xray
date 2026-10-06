@@ -105,7 +105,7 @@ Pinned core **Xray v1.260113.0** still honors `tlsSettings.allowInsecure`. Offic
 ./scripts/package-release-apks.sh
 ```
 
-Release APKs are signed with the **debug keystore** so you can sideload immediately. Replace the keystore before any store upload.
+Published APKs are signed in GitHub Actions when a `v*` tag is pushed (`.github/workflows/release.yml`). The release keystore lives in repository secrets, not in git. A local `assemble*Release` without `RELEASE_KEYSTORE_FILE` / `RELEASE_KEYSTORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD` falls back to the debug keystore and must not be uploaded.
 
 UI is Compose (BOM 2024.12.01, library minSdk 21) + D-pad on both flavors. Leanback widgets are not used. Legacy avoids API 29+ VpnService helpers, keeps MTU 1500, turns IPv6 off, and sets `useLegacyPackaging` so `.so` is extracted on kernel 4.x. Below API 26 the process is started with `startService` (not `startForegroundService`) and notification channels are skipped. `android:colorFocusedHighlight` is applied only on API 26+. A non-adaptive launcher icon is packaged for API 25.
 

@@ -17,10 +17,11 @@ Pick one APK:
 
 If you are not sure, install legacy. The two packages can be installed together.
 
-Upgrade from 0.1.8: `adb install -r` works when the signature matches. These
-release APKs are signed with the Android debug keystore of the build machine.
-If the box reports a signature conflict, uninstall the old package first
-(that clears saved nodes and the auto-reconnect flag), then install 0.1.9.
+Signing: this 0.1.9 build uses a new long-lived release key. It does not match
+v0.1.7, v0.1.8, or the first v0.1.9 upload. Uninstall the older package once
+(that clears saved nodes and the auto-reconnect flag), then install this APK.
+Every later update is signed with this same key and installs over the top
+(`adb install -r`) without another uninstall.
 
 Sideload (USB file manager or adb):
 
