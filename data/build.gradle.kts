@@ -10,8 +10,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Must not exceed the legacy app flavor (API 25) or manifest merger raises it.
-        minSdk = 25
+        // Must not exceed the legacy app flavor (API 24) or manifest merger raises it.
+        minSdk = 24
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }

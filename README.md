@@ -12,17 +12,17 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 | 电视 / 盒子 | 选这个文件 |
 | --- | --- |
-| **Android 7.1+（API 25）/ 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-legacy-0.1.9.apk`（包名 `com.passwall.tv.legacy`） |
-| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-modern-0.1.9.apk`（包名 `com.passwall.tv`） |
+| **Android 7.0+（API 24）/ 当贝 7.1 / 老盒子 / Linux 内核 4.x / 32 位机** | `Passwall-TV-Android7.0+-0.1.10.apk`（包名 `com.passwall.tv.legacy`） |
+| **Android 12+ 较新的电视（64 位）** | `Passwall-TV-Android12+-0.1.10.apk`（包名 `com.passwall.tv`） |
 
-不确定就先装 **legacy**。两个可以同时装（包名不同）。
+不确定就先装 **Android7.0+**。两个可以同时装（包名不同）。Android 5.0–6.0 不能用：内置 `libgojni.so` 的最低 API 是 24。
 
 成品路径（本机构建后，可直接拷走安装）：
 
-- `/workspace/dist/Passwall-TV-legacy-0.1.9.apk`
-- `/workspace/dist/Passwall-TV-modern-0.1.9.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-legacy-0.1.9.apk`
-- 云端下载：`/opt/cursor/artifacts/Passwall-TV-modern-0.1.9.apk`
+- `/workspace/dist/Passwall-TV-Android7.0+-0.1.10.apk`
+- `/workspace/dist/Passwall-TV-Android12+-0.1.10.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-Android7.0+-0.1.10.apk`
+- 云端下载：`/opt/cursor/artifacts/Passwall-TV-Android12+-0.1.10.apk`
 - 构建原始输出：`app/build/outputs/apk/legacy/release/app-legacy-release.apk`
 - 构建原始输出：`app/build/outputs/apk/modern/release/app-modern-release.apk`
 
@@ -38,9 +38,9 @@ GitHub：`https://github.com/Maksim-venus/android-tv-xray`
 
 ```bash
 adb connect 电视IP:5555
-adb install -r dist/Passwall-TV-legacy-0.1.9.apk
+adb install -r dist/Passwall-TV-Android7.0+-0.1.10.apk
 # 或
-adb install -r dist/Passwall-TV-modern-0.1.9.apk
+adb install -r dist/Passwall-TV-Android12+-0.1.10.apk
 ```
 
 ### 3. 第一次使用
@@ -68,8 +68,8 @@ adb install -r dist/Passwall-TV-modern-0.1.9.apk
 
 | Device | APK |
 | --- | --- |
-| Android 7.1+ (API 25) / old TV box / Linux 4.x / 32-bit | `Passwall-TV-legacy-0.1.9.apk` |
-| Newer 64-bit Android TV (API 31+) | `Passwall-TV-modern-0.1.9.apk` |
+| Android 7.0+ (API 24) / Dangbei 7.1 / old TV box / Linux 4.x / 32-bit | `Passwall-TV-Android7.0+-0.1.10.apk` |
+| Newer 64-bit Android TV (API 31+) | `Passwall-TV-Android12+-0.1.10.apk` |
 
 Sideload with a USB file manager or `adb install -r <apk>`. Fresh install has an empty node list. Enable HTTP edit on the TV, import `vless://` / `vmess://` from a phone on the same LAN, select the node, press 启动, accept the VPN dialog.
 
@@ -95,7 +95,7 @@ Pinned core **Xray v1.260113.0** still honors `tlsSettings.allowInsecure`. Offic
 
 | Flavor | applicationId | minSdk | ABI |
 | --- | --- | --- | --- |
-| **legacy** | `com.passwall.tv.legacy` | 25 (Android 7.1) | armeabi-v7a + arm64-v8a |
+| **legacy** | `com.passwall.tv.legacy` | 24 (Android 7.0) | armeabi-v7a + arm64-v8a |
 | **modern** | `com.passwall.tv` | 31 | arm64-v8a |
 
 ```bash
@@ -107,7 +107,7 @@ Pinned core **Xray v1.260113.0** still honors `tlsSettings.allowInsecure`. Offic
 
 Published APKs are signed in GitHub Actions when a `v*` tag is pushed (`.github/workflows/release.yml`). The release keystore lives in repository secrets, not in git. A local `assemble*Release` without `RELEASE_KEYSTORE_FILE` / `RELEASE_KEYSTORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD` falls back to the debug keystore and must not be uploaded.
 
-UI is Compose (BOM 2024.12.01, library minSdk 21) + D-pad on both flavors. Leanback widgets are not used. Legacy avoids API 29+ VpnService helpers, keeps MTU 1500, turns IPv6 off, and sets `useLegacyPackaging` so `.so` is extracted on kernel 4.x. Below API 26 the process is started with `startService` (not `startForegroundService`) and notification channels are skipped. `android:colorFocusedHighlight` is applied only on API 26+. A non-adaptive launcher icon is packaged for API 25.
+UI is Compose (BOM 2024.12.01, library minSdk 21) + D-pad on both flavors. Leanback widgets are not used. The legacy floor is API 24 because AndroidLibXrayLite v26.1.13's `libv2ray.aar` manifest and `libgojni.so` ELF note both require API 24; Android 5.0–6.0 cannot load that binary, and older AARs have no TUN `startLoop`. Legacy avoids API 29+ VpnService helpers, keeps MTU 1500, turns IPv6 off, and sets `useLegacyPackaging` so `.so` is extracted on kernel 4.x. Below API 26 the process is started with `startService` (not `startForegroundService`) and notification channels are skipped. Share-link Base64 is decoded without `java.util.Base64` (API 26). `android:colorFocusedHighlight` is applied only on API 26+. A non-adaptive launcher icon is packaged for pre-26 devices. On API 34+ `startForeground` passes the special-use type.
 
 Android 7.1 TV boxes still need a working `/dev/tun` (`VpnService.establish()`). Some vendor kernels omit TUN or break the VPN consent dialog; the app then reports that the TUN could not be created. Country-flag emoji may render as letters on Android 7.1’s emoji font; the exit IP text still shows.
 
