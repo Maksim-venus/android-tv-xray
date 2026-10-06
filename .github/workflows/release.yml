@@ -84,9 +84,7 @@ jobs:
           cp app/build/outputs/apk/modern/release/app-modern-release.apk "dist/Passwall-TV-modern-${ver}.apk"
           cp INSTALL.txt dist/INSTALL.txt
           if [ "$tag" = "v0.1.9" ]; then
-            notes='Re-signed 0.1.9 (versionCode 10) with the long-lived release key.
-
-This release needs a one-time uninstall of older versions because the signing key changed. That clears saved nodes. All future updates are signed with this same key and install over the top.'
+            notes='Re-signed 0.1.9 (versionCode 10) with the long-lived release key. This release needs a one-time uninstall of older versions because the signing key changed. That clears saved nodes. All future updates are signed with this same key and install over the top.'
           else
             notes="Signed with the stable Passwall TV release key. Installs over the previous build signed with this same key."
           fi
